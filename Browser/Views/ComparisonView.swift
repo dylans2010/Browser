@@ -66,7 +66,7 @@ struct ComparisonView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar(content: {
+            .toolbar{
                 Group {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close") { dismiss() }
