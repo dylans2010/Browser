@@ -35,11 +35,11 @@ struct CommandPaletteView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
-            }
+            })
         }
     }
 }

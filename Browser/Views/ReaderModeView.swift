@@ -24,21 +24,23 @@ struct ReaderModeView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    HStack {
-                        Button(action: { fontSize = max(12, fontSize - 2) }) {
-                            Image(systemName: "textformat.size.smaller")
-                        }
-                        Button(action: { fontSize = min(36, fontSize + 2) }) {
-                            Image(systemName: "textformat.size.larger")
+            .toolbar(content: {
+                Group {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        HStack {
+                            Button(action: { fontSize = max(12, fontSize - 2) }) {
+                                Image(systemName: "textformat.size.smaller")
+                            }
+                            Button(action: { fontSize = min(36, fontSize + 2) }) {
+                                Image(systemName: "textformat.size.larger")
+                            }
                         }
                     }
                 }
-            }
+            })
             .onAppear {
                 Task {
                     content = await viewModel.extractPageContent()
