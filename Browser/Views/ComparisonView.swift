@@ -70,8 +70,8 @@ struct ComparisonView: View {
                 ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
-                if !comparisonResult.isEmpty {
-                    ToolbarItemGroup(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if !comparisonResult.isEmpty {
                         Button("Reset") {
                             comparisonResult = ""
                             selectedTabIds = []
