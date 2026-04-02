@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("Shakeable") var shakeable = true
     @AppStorage("OFFSET_X") var offsetX: Double = 0
     @AppStorage("OFFSET_Y") var offsetY: Double = 0
+    @EnvironmentObject var aiConfig: AIConfiguration
     
     var offset: CGSize {
         CGSize(width: offsetX, height: offsetY)
@@ -143,6 +144,41 @@ struct SettingsView: View {
                 HStack {
                     Image(systemName: "sparkles")
                     Text("Experimental")
+                }
+            }
+
+            VStack {
+                List {
+                    Section("OpenRouter API") {
+                        SecureField("API Key", text: $aiConfig.apiKey)
+                        Text("Your OpenRouter API key is stored locally on this device.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Section("AI Model") {
+                        Picker("Select Model", selection: $aiConfig.selectedModel) {
+                            Text("GPT-4o Mini").tag("openai/gpt-4o-mini")
+                            Text("Claude 3 Haiku").tag("anthropic/claude-3-haiku")
+                            Text("Mistral Small").tag("mistralai/mistral-small")
+                        }
+
+                        TextField("Custom Model ID", text: $aiConfig.customModel)
+                            .disableAutocorrection(true)
+#if os(iOS)
+                            .autocapitalization(.none)
+#endif
+                        Text("Enter a custom model ID from OpenRouter to override the selection above.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("AI Settings")
+            .tabItem {
+                HStack {
+                    Image(systemName: "brain")
+                    Text("AI")
                 }
             }
         }

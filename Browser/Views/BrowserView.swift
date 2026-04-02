@@ -14,6 +14,19 @@ struct BrowserView: View {
     @State private var hideURLbar = false
     @State private var shakeOptions = false
     @State private var showSettings = false
+    @State private var showSummary = false
+    @State private var showAIChat = false
+    @State private var showComparison = false
+    @State private var showReaderMode = false
+    @State private var showNotes = false
+    @State private var showCommandPalette = false
+    @State private var showTabGrid = false
+    @State private var showHistory = false
+    @State private var isSplitView = false
+    @EnvironmentObject var aiConfig: AIConfiguration
+    @EnvironmentObject var notesManager: NotesManager
+    @EnvironmentObject var ttsManager: TTSManager
+    @EnvironmentObject var historyManager: HistoryManager
     @AppStorage("Save-Last-URL") var saveLastURL = false
     @AppStorage("Movable URL-Bar") var urlBarMovable = false
     @AppStorage("Quick Position Reset Overlay") var quickPositionReset = false
@@ -31,15 +44,41 @@ struct BrowserView: View {
     }
     var body: some View {
         ZStack {
-            if let url =  URL(string: browserViewModel.urlString) {
-                BrowserWebView(url: url,
-                               viewModel: browserViewModel)
-                .edgesIgnoringSafeArea(.all)
+            HStack(spacing: 0) {
+                if let activeTab = browserViewModel.activeTab {
+                    BrowserWebView(webView: activeTab.webView)
+                    .edgesIgnoringSafeArea(.all)
 #if os(iOS)
-                .padding(.top, 1)
+                    .padding(.top, 1)
+                    .gesture(
+                        DragGesture(minimumDistance: 50)
+                            .onEnded { value in
+                                if value.translation.width > 0 {
+                                    browserViewModel.goBack()
+                                } else {
+                                    browserViewModel.goForward()
+                                }
+                            }
+                    )
 #endif
-            } else {
-                NewTabPage()
+                } else {
+                    NewTabPage()
+                }
+
+                if isSplitView {
+                    Divider()
+                    List {
+                        Section("Quick Notes") {
+                            ForEach(notesManager.notes) { note in
+                                Text(note.text)
+                                    .font(.caption)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                    .frame(width: 250)
+                    .background(Color.gray.opacity(0.1))
+                }
             }
             VStack {
                 if urlBarMovable {
@@ -146,6 +185,24 @@ struct BrowserView: View {
                             })
                             .disableAutocorrection(true)
                             .textFieldStyle(.plain)
+
+                            Button(action: {
+                                showTabGrid = true
+                            }) {
+                                Image(systemName: "square.on.square")
+                                    .font(.system(size: 24, weight: .medium))
+                                    .foregroundStyle(.primary)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button(action: {
+                                browserViewModel.addTab()
+                            }) {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 24, weight: .medium))
+                                    .foregroundStyle(.primary)
+                            }
+                            .buttonStyle(.plain)
 #if os(iOS)
                             .autocapitalization(.none)
 #endif
@@ -217,6 +274,53 @@ struct BrowserView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                Button("Summarize Page", systemImage: "doc.text.magnifyingglass") {
+                                    showSummary = true
+                                }
+                                Button("Ask the Page", systemImage: "bubble.left.and.bubble.right") {
+                                    showAIChat = true
+                                }
+                                Button("Reader Mode", systemImage: "text.justify.left") {
+                                    showReaderMode = true
+                                }
+                                Button(ttsManager.isSpeaking ? "Stop Speaking" : "Listen to Page", systemImage: ttsManager.isSpeaking ? "stop.fill" : "speaker.wave.2") {
+                                    if ttsManager.isSpeaking {
+                                        ttsManager.stop()
+                                    } else {
+                                        Task {
+                                            let content = await browserViewModel.extractPageContent()
+                                            ttsManager.speak(content)
+                                        }
+                                    }
+                                }
+                                Button("Show Notes", systemImage: "note.text") {
+                                    showNotes = true
+                                }
+                                Button(isSplitView ? "Hide Split View" : "Show Split View", systemImage: "sidebar.right") {
+                                    isSplitView.toggle()
+                                }
+                                Button("Command Palette", systemImage: "terminal") {
+                                    showCommandPalette = true
+                                }
+                                Button("Extract Tasks", systemImage: "checklist") {
+                                    Task {
+                                        let content = await browserViewModel.extractPageContent()
+                                        do {
+                                            let tasks = try await TaskExtractor.shared.extractTasks(from: content, apiKey: aiConfig.apiKey, model: aiConfig.currentModel)
+                                            for task in tasks {
+                                                notesManager.addNote(text: "TASK: \(task.title) - \(task.description)", sourceURL: browserViewModel.urlString)
+                                            }
+                                        } catch {
+                                            print("Task extraction failed")
+                                        }
+                                    }
+                                }
+                                Button("History", systemImage: "clock") {
+                                    showHistory = true
+                                }
+                                Button("Compare Tabs", systemImage: "square.split.2x1") {
+                                    showComparison = true
+                                }
                                 Button("Settings", systemImage: "gear") {
                                     showSettings = true
                                 }
@@ -309,6 +413,44 @@ struct BrowserView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showSummary) {
+            SummaryView(viewModel: browserViewModel)
+                .environmentObject(aiConfig)
+        }
+        .sheet(isPresented: $showAIChat) {
+            AIChatView(viewModel: browserViewModel)
+                .environmentObject(aiConfig)
+        }
+        .sheet(isPresented: $showComparison) {
+            ComparisonView(viewModel: browserViewModel)
+                .environmentObject(aiConfig)
+        }
+        .sheet(isPresented: $showReaderMode) {
+            ReaderModeView(viewModel: browserViewModel)
+        }
+        .sheet(isPresented: $showNotes) {
+            NotesView(notesManager: notesManager)
+        }
+        .sheet(isPresented: $showCommandPalette) {
+            CommandPaletteView(viewModel: browserViewModel, actions: [
+                ("Summarize Page", "doc.text.magnifyingglass", { showSummary = true }),
+                ("Ask the Page", "bubble.left.and.bubble.right", { showAIChat = true }),
+                ("New Ephemeral Tab", "incognito", { browserViewModel.addTab(isEphemeral: true) }),
+                ("Clear History", "trash", { WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast, completionHandler: {}) })
+            ])
+        }
+        .sheet(isPresented: $showTabGrid) {
+            TabGridView(viewModel: browserViewModel)
+        }
+        .sheet(isPresented: $showHistory) {
+            HistoryView(historyManager: historyManager)
+        }
+        .onAppear {
+            browserViewModel.historyManager = historyManager
+        }
+        .onChange(of: browserViewModel.activeTabId) { _ in
+            browserViewModel.suspendInactiveTabs()
         }
         .confirmationDialog("Shake Menu", isPresented: $shakeOptions, titleVisibility: .visible) {
             Button("Open Settings") {
