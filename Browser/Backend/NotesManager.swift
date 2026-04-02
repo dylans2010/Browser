@@ -1,7 +1,7 @@
 import Foundation
 
 struct Note: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let text: String
     let date: Date
     let sourceURL: String
