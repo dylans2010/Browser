@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HistoryItem: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let url: String
     let title: String
     let date: Date

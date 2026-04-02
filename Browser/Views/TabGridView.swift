@@ -51,10 +51,10 @@ struct TabGridView: View {
             }
             .navigationTitle("Tabs")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Button(action: { viewModel.addTab() }) {
                         Image(systemName: "plus")
                     }
