@@ -30,13 +30,13 @@ struct SummaryView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
                 }
-            }
+            })
         }
         .onAppear {
             summarizePage()

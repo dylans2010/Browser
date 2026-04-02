@@ -56,11 +56,11 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Close") { dismiss() }
                 }
-            }
+            })
         }
     }
 }
