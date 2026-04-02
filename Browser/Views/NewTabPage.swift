@@ -8,37 +8,91 @@ struct NewTabPage: View {
     @State private var image: Image? = nil
     @AppStorage("Use-Image") var useImage = false
     @AppStorage("Selected NewTab Config") var selectedNewTabConfig = 1
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var browserViewModel: BrowserViewModel
+
+    @State private var showCollections = false
 
     var body: some View {
         ZStack {
-            if useImage {
-                DefaultImageView()
-                    .onAppear {
-                        if useImage {selectedNewTabConfig = 0}
+            backgroundView
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { showCollections = true }) {
+                        Image(systemName: "folder.fill")
+                            .font(.title)
+                            .padding()
+                            .background(.thinMaterial)
+                            .clipShape(Circle())
                     }
+                    .padding()
+                }
+
+                Spacer()
+
+                Text("Welcome")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .padding(.bottom, 40)
+
+                favoritesGrid
+
+                Spacer()
             }
-            else {
-                CameraView()
-                    .onAppear {
-                        if !useImage {selectedNewTabConfig = 1}
-                    }
-                
-            }
-            Text("""
-                Hello
-                """)
-                .font(.largeTitle)
-                .bold()
-                .background(
-                    RoundedRectangle(cornerRadius: 0)
-                        .foregroundStyle(.ultraThinMaterial)
-                        .frame(width: 10000, height: 10000)
-                )
-            
         }
         .edgesIgnoringSafeArea(.all)
+        .sheet(isPresented: $showCollections) {
+            CollectionsView()
+        }
+    }
+
+    private var backgroundView: some View {
+        Group {
+            if useImage {
+                DefaultImageView()
+            } else {
+                CameraView()
+                    .overlay(.ultraThinMaterial)
+            }
+        }
+    }
+
+    private var favoritesGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 20) {
+                ForEach(favoritesManager.favorites) { favorite in
+                    Button(action: {
+                        if let url = URL(string: favorite.url) {
+                            browserViewModel.addTab(url: url)
+                        }
+                    }) {
+                        VStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 15)
+                                    .fill(.ultraThinMaterial)
+                                    .frame(width: 80, height: 80)
+
+                                Text(favorite.title.prefix(1).uppercased())
+                                    .font(.title)
+                                    .bold()
+                            }
+
+                            Text(favorite.title)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .frame(width: 100)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
+        }
+        .frame(maxHeight: 400)
     }
 }
+
 #if os (iOS)
 struct CameraView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> CameraViewController {
@@ -227,33 +281,6 @@ class CameraViewController: NSViewController {
     override func viewWillDisappear() {
         super.viewWillDisappear()
         captureSession.stopRunning()
-    }
-}
-#endif
-import SwiftUI
-
-// Define a protocol for handling images that works across platforms
-protocol PlatformImage {
-    associatedtype ImageType
-    static func create(from data: Data) -> ImageType?
-}
-
-#if os(iOS)
-import UIKit
-
-// Conform to PlatformImage for iOS using UIImage
-extension UIImage: PlatformImage {
-    static func create(from data: Data) -> UIImage? {
-        return UIImage(data: data)
-    }
-}
-#elseif os(macOS)
-import AppKit
-
-// Conform to PlatformImage for macOS using NSImage
-extension NSImage: PlatformImage {
-    static func create(from data: Data) -> NSImage? {
-        return NSImage(data: data)
     }
 }
 #endif

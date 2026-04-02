@@ -1,10 +1,3 @@
-//
-//  BrowserApp.swift
-//  Browser
-//
-//  Created by timi2506 on 06.12.2024.
-//
-
 import SwiftUI
 
 @main
@@ -13,6 +6,10 @@ struct BrowserApp: App {
     @StateObject private var notesManager = NotesManager()
     @StateObject private var ttsManager = TTSManager()
     @StateObject private var historyManager = HistoryManager()
+    @StateObject private var downloadManager = DownloadManager()
+    @StateObject private var toolbarManager = ToolbarManager()
+    @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var collectionsManager = CollectionsManager()
 
     var body: some Scene {
         WindowGroup {
@@ -21,11 +18,16 @@ struct BrowserApp: App {
                 .environmentObject(notesManager)
                 .environmentObject(ttsManager)
                 .environmentObject(historyManager)
+                .environmentObject(downloadManager)
+                .environmentObject(toolbarManager)
+                .environmentObject(favoritesManager)
+                .environmentObject(collectionsManager)
         }
 #if os(macOS)
         Settings {
             SettingsView()
                 .environmentObject(aiConfig)
+                .environmentObject(toolbarManager)
         }
 #endif
     }
