@@ -8,6 +8,7 @@ class BrowserViewModel: NSObject, ObservableObject {
     @Published var canGoBack = false
     @Published var canGoForward = false
     var historyManager: HistoryManager?
+    var downloadManager: DownloadManager?
 
     var activeTab: TabItem? {
         tabs.first(where: { $0.id == activeTabId })
@@ -54,6 +55,15 @@ class BrowserViewModel: NSObject, ObservableObject {
     }
 
     func removeTab(id: UUID) {
+        if let tab = tabs.first(where: { $0.id == id }) {
+            if tab.isEphemeral {
+                let saveDataWhilePrivate = UserDefaults.standard.bool(forKey: "saveDataWhilePrivate")
+                if saveDataWhilePrivate {
+                    tab.webView.configuration.websiteDataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {}
+                }
+            }
+        }
+
         tabs.removeAll(where: { $0.id == id })
         if activeTabId == id {
             activeTabId = tabs.last?.id
@@ -102,9 +112,41 @@ extension BrowserViewModel: WKNavigationDelegate {
         }
 
         if let url = navigationAction.request.url {
-            NetworkInspector.shared.logRequest(url: url.absoluteString, method: navigationAction.request.httpMethod ?? "GET", status: 0)
+            if AdBlocker.shared.shouldBlock(url: url) {
+                decisionHandler(.cancel)
+                return
+            }
         }
 
+        if let url = navigationAction.request.url {
+            NetworkInspector.shared.logRequest(url: url.absoluteString, method: navigationAction.request.httpMethod ?? "GET", status: 0)
+
+            // Check for potential downloads (file extensions or specific headers)
+            let pathExtension = url.pathExtension.lowercased()
+            let downloadExtensions = ["zip", "pdf", "dmg", "pkg", "exe", "ipa", "apk", "mp3", "mp4", "mov", "wav"]
+            if downloadExtensions.contains(pathExtension) {
+                downloadManager?.startDownload(url: url)
+                decisionHandler(.cancel)
+                return
+            }
+        }
+
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if let response = navigationResponse.response as? HTTPURLResponse {
+            let contentType = response.allHeaderFields["Content-Type"] as? String ?? ""
+            let contentDisposition = response.allHeaderFields["Content-Disposition"] as? String ?? ""
+
+            if contentDisposition.contains("attachment") || contentType.contains("application/octet-stream") {
+                if let url = response.url {
+                    downloadManager?.startDownload(url: url)
+                    decisionHandler(.cancel)
+                    return
+                }
+            }
+        }
         decisionHandler(.allow)
     }
 
@@ -119,8 +161,15 @@ extension BrowserViewModel: WKNavigationDelegate {
                 canGoForward = webView.canGoForward
             }
 
-            if let url = webView.url?.absoluteString, !tabs[index].isEphemeral {
-                historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
+            if let url = webView.url?.absoluteString {
+                if tabs[index].isEphemeral {
+                    let saveDataWhilePrivate = UserDefaults.standard.bool(forKey: "saveDataWhilePrivate")
+                    if !saveDataWhilePrivate {
+                        historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
+                    }
+                } else {
+                    historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
+                }
             }
 
             saveTabs()

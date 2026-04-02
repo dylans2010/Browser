@@ -12,175 +12,138 @@ struct SettingsView: View {
     @AppStorage("Shakeable") var shakeable = true
     @AppStorage("OFFSET_X") var offsetX: Double = 0
     @AppStorage("OFFSET_Y") var offsetY: Double = 0
-    @EnvironmentObject var aiConfig: AIConfiguration
     
-    var offset: CGSize {
-        CGSize(width: offsetX, height: offsetY)
-    }
+    // New Settings
+    @AppStorage("addressBarStyle") var addressBarStyle: String = "Modern"
+    @AppStorage("addressBarPosition") var addressBarPosition: String = "Bottom"
+    @AppStorage("saveDataWhilePrivate") var saveDataWhilePrivate: Bool = false
+    @AppStorage("privatePasscode") var privatePasscode: String = ""
+
+    @EnvironmentObject var aiConfig: AIConfiguration
+    @EnvironmentObject var toolbarManager: ToolbarManager
     
     var body: some View {
         TabView {
-            VStack {
-                List {
-                    Section("Default URL") {
-                        VStack {
-                            TextField("""
-                        e.g. "https:/example.com"
-                        """, text: $DefaultURL)
+            generalSettings
+            appearanceSettings
+            toolbarSettings
+            aiSettings
+            privateBrowsingSettings
+            experimentalSettings
+        }
+    }
+
+    private var generalSettings: some View {
+        VStack {
+            List {
+                Section("Default URL") {
+                    VStack {
+                        TextField("e.g. https://example.com", text: $DefaultURL)
                             .disabled(saveLastURL)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .disableAutocorrection(true)
-#if os(iOS)
-                            .autocapitalization(.none)
-#endif
-                            Text("""
-                         DON'T FORGET TO PUT THE PREFIX (https:// or http://) IN FRONT OF THE VALUE
-                         (Example: "https://google.com" instead of just "google.com")
-                         
-                         To show the Default New-Tab-Page leave this field blank
-                         """)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        }
-                        VStack {
-                            Toggle(isOn: $saveLastURL) {
-                                Text("Save Last URL")
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            
-                            Text("Toggles if the App should save the URL opened before closing to reopen it after an app restart")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        }
-                        
-                    }
-                    Section ("New Tab Page Customization") {
-                        Picker ("Background", selection: $selectedNewTabConfig) {
-                            Text("Background Image")
-                                .tag(0)
-                            Text("Blurred Camera View")
-                                .tag(1)
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .onChange(of: selectedNewTabConfig) { newValue in
-                            if newValue == 1 {
-                                useBlurredView = true
-                                useImage = false
-                            }
-                            if newValue == 0 {
-                                useBlurredView = false
-                                useImage = true
-                            }
-                        }
-                        Text("NOTE: Blurred Camera View captures live input from your camera and overlays a blur over it, the camera data is not sent to any third partys and is completely handled on-device, to read more about how it works, feel free to look at the Source Code on GitHub")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                    }
-                    Section ("More") {
-                        VStack {
-                            Toggle(isOn: $shakeable) {
-                                Text("Enable Shake Menu")
-                            }
-                            Text("Toggles showing a Menu to quickly open Settings and, if enabled, quickly Reset URL Bar Movement, STRONGLY RECOMMENDED TO KEEP ON")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("General Settings")
-            .tabItem {
-                HStack {
-                    Image(systemName: "gear")
-                    Text("General")
-                }
-            }
-            VStack {
-                List {
-                    Text("Disclaimer: These are experimental options available for users to test, they might be unstable, use at your own risk")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Section("URL-Bar Movement") {
-                        VStack {
-                            Toggle("Enable URL-Bar Movement", isOn: $urlBarMovable)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            Text("Toggle whether the URL-Bar can be dragged to a different position or not")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        }
-                        
-                        VStack {
-                            Toggle("Enable Quick Position Reset", isOn: $quickPositionReset)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            Text("Toggles showing a small overlay to reset the URL Bar Position in case it ever goes off-screen or has to be quickly reset without opening Settings")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        }
-                        .disabled(!urlBarMovable)
-
-                        VStack {
-                            Button ("Reset URL Bar Offset") {
-                                offsetX = 0
-                                offsetY = 0
-                            }
-                            .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                            Text("Moves the URL-Bar back to the Default Position")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        }
-                        .disabled(!urlBarMovable)
-                    }
-                }
-            }
-            .navigationTitle("Experimental Settings")
-            .tabItem {
-                HStack {
-                    Image(systemName: "sparkles")
-                    Text("Experimental")
-                }
-            }
-
-            VStack {
-                List {
-                    Section("OpenRouter API") {
-                        SecureField("API Key", text: $aiConfig.apiKey)
-                        Text("Your OpenRouter API key is stored locally on this device.")
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        #endif
+                        Text("To show the Default New-Tab-Page leave this field blank")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-
-                    Section("AI Model") {
-                        Picker("Select Model", selection: $aiConfig.selectedModel) {
-                            Text("GPT-4o Mini").tag("openai/gpt-4o-mini")
-                            Text("Claude 3 Haiku").tag("anthropic/claude-3-haiku")
-                            Text("Mistral Small").tag("mistralai/mistral-small")
-                        }
-
-                        TextField("Custom Model ID", text: $aiConfig.customModel)
-                            .disableAutocorrection(true)
-#if os(iOS)
-                            .autocapitalization(.none)
-#endif
-                        Text("Enter a custom model ID from OpenRouter to override the selection above.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Toggle("Save Last URL", isOn: $saveLastURL)
                 }
-            }
-            .navigationTitle("AI Settings")
-            .tabItem {
-                HStack {
-                    Image(systemName: "brain")
-                    Text("AI")
+                Section ("New Tab Page") {
+                    Picker ("Background", selection: $selectedNewTabConfig) {
+                        Text("Image").tag(0)
+                        Text("Blurred Camera").tag(1)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                Section ("More") {
+                    Toggle("Enable Shake Menu", isOn: $shakeable)
                 }
             }
         }
+        .tabItem { Label("General", systemImage: "gear") }
+    }
+
+    private var appearanceSettings: some View {
+        List {
+            Section("Address Bar Style") {
+                Picker("Style", selection: $addressBarStyle) {
+                    Text("Liquid Glass").tag("Liquid Glass")
+                    Text("Modern").tag("Modern")
+                    Text("Classic").tag("Classic")
+                }
+                Picker("Position", selection: $addressBarPosition) {
+                    Text("Top").tag("Top")
+                    Text("Bottom").tag("Bottom")
+                    Text("Compact").tag("Compact")
+                }
+            }
+        }
+        .tabItem { Label("Appearance", systemImage: "paintbrush") }
+    }
+
+    private var toolbarSettings: some View {
+        List {
+            Section("Toolbar Customization") {
+                ForEach(toolbarManager.availableTools) { tool in
+                    HStack {
+                        Image(systemName: tool.icon)
+                            .frame(width: 30)
+                        Text(tool.title)
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { tool.isEnabled },
+                            set: { _ in toolbarManager.toggleToolVisibility(id: tool.id) }
+                        ))
+                    }
+                }
+                .onMove(perform: toolbarManager.reorderTools)
+            }
+        }
+        .tabItem { Label("Toolbar", systemImage: "hammer") }
+    }
+
+    private var aiSettings: some View {
+        List {
+            Section("OpenRouter API") {
+                SecureField("API Key", text: $aiConfig.apiKey)
+            }
+            Section("AI Model") {
+                Picker("Select Model", selection: $aiConfig.selectedModel) {
+                    Text("GPT-4o Mini").tag("openai/gpt-4o-mini")
+                    Text("Claude 3 Haiku").tag("anthropic/claude-3-haiku")
+                    Text("Mistral Small").tag("mistralai/mistral-small")
+                }
+                TextField("Custom Model ID", text: $aiConfig.customModel)
+                    .disableAutocorrection(true)
+            }
+        }
+        .tabItem { Label("AI", systemImage: "brain") }
+    }
+
+    private var privateBrowsingSettings: some View {
+        List {
+            Section("Security") {
+                SecureField("Set Passcode", text: $privatePasscode)
+                Toggle("Save Data While Private", isOn: $saveDataWhilePrivate)
+            }
+        }
+        .tabItem { Label("Private", systemImage: "hand.raised") }
+    }
+
+    private var experimentalSettings: some View {
+        List {
+            Section("URL-Bar Movement") {
+                Toggle("Enable Movement", isOn: $urlBarMovable)
+                Toggle("Quick Reset Overlay", isOn: $quickPositionReset)
+                Button("Reset Position") {
+                    offsetX = 0
+                    offsetY = 0
+                }
+            }
+        }
+        .tabItem { Label("Experimental", systemImage: "sparkles") }
     }
 }
