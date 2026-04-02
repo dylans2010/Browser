@@ -1,7 +1,7 @@
 import Foundation
 
 struct TaskItem: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let title: String
     let description: String
     let status: TaskStatus
