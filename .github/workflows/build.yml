@@ -1,0 +1,100 @@
+name: Create New Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+  SECRET_ID: ${{ secrets.SECRET_ID }}
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+      
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Verify Xcode Version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Clean Build Environment
+        run: |
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
+      - name: Verify CI secret wiring
+        run: |
+          if [ -n "$CLIENT_SECRET" ]; then
+            echo "CLIENT_SECRET is set (masked)"
+          else
+            echo "CLIENT_SECRET is missing"
+          fi
+
+          if [ -n "$SECRET_ID" ]; then
+            echo "SECRET_ID is set (masked)"
+          else
+            echo "SECRET_ID is missing"
+          fi
+
+      - name: Resolve Package Dependencies
+        run: xcodebuild -project Browser.xcodeproj -scheme Browser -resolvePackageDependencies
+
+      - name: Compile and Build .ipa
+        run: |
+          mkdir -p upload
+          xcodebuild -project Browser.xcodeproj \
+            -scheme Browser \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -sdk iphoneos \
+            -archivePath upload/Browser.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+          mkdir -p upload/Payload
+          cp -R upload/Browser.xcarchive/Products/Applications/*.app upload/Payload/
+          cd upload
+          zip -r Browser.ipa Payload
+
+      - name: Verify IPA and Info.plist
+        run: |
+          ls -la upload/
+          test -f upload/Browser.ipa && echo "IPA created successfully"
+
+          # Extract and validate Info.plist from the built app
+          echo "Validating Info.plist in the .app bundle..."
+          APP_PATH="upload/Payload/Browser.app"
+          if [ -f "$APP_PATH/Info.plist" ]; then
+            echo "Info.plist found in .app bundle"
+            /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP_PATH/Info.plist" || echo "Warning: CFBundleIdentifier missing"
+            /usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP_PATH/Info.plist" || echo "Warning: CFBundleExecutable missing"
+            /usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP_PATH/Info.plist" || echo "Warning: CFBundleVersion missing"
+            /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_PATH/Info.plist" || echo "Warning: CFBundleShortVersionString missing"
+            echo "Info.plist validation complete"
+          else
+            echo "ERROR: Info.plist not found in .app bundle!"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Browser Build ${{ github.run_number }}
+          files: upload/Browser.ipa
+          generate_release_notes: true
