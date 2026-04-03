@@ -9,7 +9,7 @@ struct TabGroup: Identifiable, Codable {
 }
 
 @available(iOS 16.0, *)
-class BrowserViewModel: NSObject, ObservableObject {
+class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
     @Published var tabs: [TabItem] = []
     @Published var tabGroups: [TabGroup] = []
     @Published var activeGroupId: UUID?

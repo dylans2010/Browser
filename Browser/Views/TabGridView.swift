@@ -14,16 +14,25 @@ struct TabGridView: View {
         NavigationView {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(viewModel.tabs) { tab in
+                    ForEach(viewModel.tabs, id: \.id) { tab in
                         VStack {
                             ZStack {
                                 if let snapshot = tab.snapshot {
+                                    #if os(iOS)
                                     Image(uiImage: snapshot)
                                         .resizable()
                                         .aspectRatio(3/4, contentMode: .fill)
                                         .frame(maxWidth: .infinity)
                                         .cornerRadius(12)
                                         .clipped()
+                                    #elseif os(macOS)
+                                    Image(nsImage: snapshot)
+                                        .resizable()
+                                        .aspectRatio(3/4, contentMode: .fill)
+                                        .frame(maxWidth: .infinity)
+                                        .cornerRadius(12)
+                                        .clipped()
+                                    #endif
                                 } else {
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(Color.gray.opacity(0.1))
