@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct NewTabView: View {
     @EnvironmentObject var browserViewModel: BrowserViewModel
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -36,7 +37,7 @@ struct NewTabView: View {
             if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
                 VStack {
                     Spacer().frame(height: 100)
-                    SearchSuggestionsView(suggestionManager: suggestionManager) { selected in
+                    SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
                         browserViewModel.urlString = selected
                         loadURL()
                         isAddressBarFocused = false
