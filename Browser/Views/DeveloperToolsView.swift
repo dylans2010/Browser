@@ -9,6 +9,9 @@ struct DeveloperToolsView: View {
     @ObservedObject var networkInspector = NetworkInspector.shared
     @State private var domInfo = InspectElementTool.DOMInfo(tagCount: 0, scriptCount: 0, linkCount: 0, imageCount: 0, iframeCount: 0, title: "", charset: "")
     @State private var hasLoadedDOMInfo = false
+    @State private var cookies: [String] = []
+    @State private var localStorage: [String: String] = [:]
+    @State private var performanceMetrics: [String: String] = [:]
 
     var body: some View {
         NavigationView {
@@ -61,10 +64,48 @@ struct DeveloperToolsView: View {
                         }
                     }
                 }
+
+                Section("Cookies") {
+                    if cookies.isEmpty {
+                        Text("No cookies found")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(cookies, id: \.self) { cookie in
+                            Text(cookie)
+                                .font(.caption.monospaced())
+                        }
+                    }
+                }
+
+                Section("Local Storage") {
+                    if localStorage.isEmpty {
+                        Text("No local storage items")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(Array(localStorage.keys.sorted()), id: \.self) { key in
+                            VStack(alignment: .leading) {
+                                Text(key).font(.caption.bold())
+                                Text(localStorage[key] ?? "").font(.caption2.monospaced()).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                Section("Performance") {
+                    if performanceMetrics.isEmpty {
+                        Text("No performance data")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(Array(performanceMetrics.keys.sorted()), id: \.self) { key in
+                            row(label: key, value: performanceMetrics[key] ?? "")
+                        }
+                    }
+                }
             }
             .navigationTitle("Developer Tools")
             .onAppear {
                 refreshDOMInfo()
+                fetchDiagnostics()
             }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -97,6 +138,46 @@ struct DeveloperToolsView: View {
         InspectElementTool.inspect(webView: webView) { info in
             domInfo = info
             hasLoadedDOMInfo = true
+        }
+    }
+
+    private func fetchDiagnostics() {
+        // Fetch Cookies
+        webView.evaluateJavaScript("document.cookie") { result, _ in
+            if let cookieStr = result as? String, !cookieStr.isEmpty {
+                self.cookies = cookieStr.components(separatedBy: "; ")
+            }
+        }
+
+        // Fetch Local Storage
+        let lsJS = "JSON.stringify(localStorage)"
+        webView.evaluateJavaScript(lsJS) { result, _ in
+            if let jsonStr = result as? String,
+               let data = jsonStr.data(using: .utf8),
+               let dict = try? JSONDecoder().decode([String: String].self, from: data) {
+                self.localStorage = dict
+            }
+        }
+
+        // Fetch Performance Metrics
+        let perfJS = """
+        (function() {
+            const t = performance.timing;
+            return JSON.stringify({
+                "Page Load": (t.loadEventEnd - t.navigationStart) + "ms",
+                "DOM Ready": (t.domContentLoadedEventEnd - t.navigationStart) + "ms",
+                "DNS Lookup": (t.domainLookupEnd - t.domainLookupStart) + "ms",
+                "TCP Connect": (t.connectEnd - t.connectStart) + "ms",
+                "Response Time": (t.responseEnd - t.requestStart) + "ms"
+            });
+        })()
+        """
+        webView.evaluateJavaScript(perfJS) { result, _ in
+            if let jsonStr = result as? String,
+               let data = jsonStr.data(using: .utf8),
+               let dict = try? JSONDecoder().decode([String: String].self, from: data) {
+                self.performanceMetrics = dict
+            }
         }
     }
 }

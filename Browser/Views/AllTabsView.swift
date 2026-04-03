@@ -8,6 +8,7 @@ struct AllTabsView: View {
     @State private var layout: TabLayout = .grid
     @State private var sortOrder: TabSortOrder = .recent
     @State private var showCreateGroup = false
+    @State private var editingGroup: TabGroup?
     @State private var newGroupName = ""
     @State private var newGroupColor: Color = .blue
 
@@ -70,6 +71,7 @@ struct AllTabsView: View {
             }
             .sheet(isPresented: $showCreateGroup) {
                 createGroupSheet
+                    .presentationDetents([.medium])
             }
         }
     }
@@ -193,6 +195,22 @@ struct AllTabsView: View {
                             .foregroundColor(viewModel.activeGroupId == group.id ? .white : .primary)
                             .cornerRadius(20)
                         }
+                        .contextMenu {
+                            Button {
+                                editingGroup = group
+                                newGroupName = group.name
+                                newGroupColor = Color(hex: group.color)
+                                showCreateGroup = true
+                            } label: {
+                                Label("Edit Group", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                viewModel.deleteTabGroup(id: group.id)
+                            } label: {
+                                Label("Delete Group", systemImage: "trash")
+                            }
+                        }
                     }
 
                     Button(action: { showCreateGroup = true }) {
@@ -213,15 +231,24 @@ struct AllTabsView: View {
                 TextField("Group Name", text: $newGroupName)
                 ColorPicker("Color", selection: $newGroupColor)
             }
-            .navigationTitle("New Tab Group")
+            .navigationTitle(editingGroup == nil ? "New Tab Group" : "Edit Tab Group")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showCreateGroup = false }
+                    Button("Cancel") {
+                        showCreateGroup = false
+                        editingGroup = nil
+                        newGroupName = ""
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        viewModel.createTabGroup(name: newGroupName, color: newGroupColor.toHex() ?? "#007AFF")
+                    Button(editingGroup == nil ? "Create" : "Save") {
+                        if let group = editingGroup {
+                            viewModel.updateTabGroup(id: group.id, name: newGroupName, color: newGroupColor.toHex() ?? "#007AFF")
+                        } else {
+                            viewModel.createTabGroup(name: newGroupName, color: newGroupColor.toHex() ?? "#007AFF")
+                        }
                         newGroupName = ""
+                        editingGroup = nil
                         showCreateGroup = false
                     }
                     .disabled(newGroupName.isEmpty)
