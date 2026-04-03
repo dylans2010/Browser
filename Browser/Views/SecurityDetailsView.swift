@@ -82,13 +82,15 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         session.dataTask(with: secureURL).resume()
     }
 
-    @MainActor
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping @MainActor @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let trust = challenge.protectionSpace.serverTrust else {
             completionHandler(.performDefaultHandling, nil)
             return
         }
+
+        var trustError: CFError?
+        _ = SecTrustEvaluateWithError(trust, &trustError)
 
         guard let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
               let cert = certificates.first else {
@@ -102,13 +104,20 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         var validFrom: Date?
         var validTo: Date?
 
-        if let trustProperties = SecTrustCopyProperties(trust) as? [[CFString: Any]] {
-            for property in trustProperties {
-                guard let title = (property[kSecPropertyTypeTitle] as? String)?.lowercased() else { continue }
-                if issuer == "Unavailable", title.contains("issuer"),
-                   let value = property[kSecPropertyTypeValue] {
-                    issuer = String(describing: value)
-                }
+        if let values = SecCertificateCopyValues(cert, [kSecOIDX509V1IssuerName, kSecOIDX509V1ValidityNotBefore, kSecOIDX509V1ValidityNotAfter] as CFArray, nil) as? [CFString: Any] {
+            if let issuerEntry = values[kSecOIDX509V1IssuerName] as? [CFString: Any],
+               let issuerValue = issuerEntry[kSecPropertyKeyValue] {
+                issuer = String(describing: issuerValue)
+            }
+
+            if let notBeforeEntry = values[kSecOIDX509V1ValidityNotBefore] as? [CFString: Any],
+               let notBeforeValue = notBeforeEntry[kSecPropertyKeyValue] {
+                validFrom = certificateDate(from: notBeforeValue)
+            }
+
+            if let notAfterEntry = values[kSecOIDX509V1ValidityNotAfter] as? [CFString: Any],
+               let notAfterValue = notAfterEntry[kSecPropertyKeyValue] {
+                validTo = certificateDate(from: notAfterValue)
             }
         }
 
@@ -283,5 +292,21 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
             return nil
         }
         return String(source[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func certificateDate(from value: Any) -> Date? {
+        if let date = value as? Date {
+            return date
+        }
+
+        if let timestamp = value as? TimeInterval {
+            return Date(timeIntervalSinceReferenceDate: timestamp)
+        }
+
+        if let raw = value as? String {
+            return parseDate(from: raw)
+        }
+
+        return nil
     }
 }
