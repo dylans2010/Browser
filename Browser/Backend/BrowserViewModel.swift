@@ -8,6 +8,8 @@ class BrowserViewModel: NSObject, ObservableObject {
     @Published var urlString: String = ""
     @Published var canGoBack = false
     @Published var canGoForward = false
+    @Published var isLoading = false
+    @Published var loadError: String? = nil
     var historyManager: HistoryManager?
     var downloadManager: DownloadManager?
 
@@ -84,6 +86,7 @@ class BrowserViewModel: NSObject, ObservableObject {
 
     func loadURLString() {
         guard let activeTab = activeTab, let url = URL(string: urlString) else { return }
+        loadError = nil
         activeTab.webView.load(URLRequest(url: url))
     }
 
@@ -96,7 +99,34 @@ class BrowserViewModel: NSObject, ObservableObject {
     }
 
     func reload() {
+        loadError = nil
         activeTab?.webView.reload()
+    }
+
+    func hardRefresh() {
+        loadError = nil
+        activeTab?.webView.reloadFromOrigin()
+    }
+
+    func stopLoading() {
+        activeTab?.webView.stopLoading()
+        isLoading = false
+    }
+
+    func duplicateTab() {
+        guard let current = activeTab else { return }
+        addTab(url: current.url)
+    }
+
+    func closeOtherTabs() {
+        guard let activeId = activeTabId else { return }
+        let toRemove = tabs.filter { $0.id != activeId }
+        for tab in toRemove {
+            tab.webView.navigationDelegate = nil
+            tab.webView.stopLoading()
+        }
+        tabs.removeAll { $0.id != activeId }
+        saveTabs()
     }
 
     func extractPageContent() async -> String {
@@ -118,6 +148,36 @@ class BrowserViewModel: NSObject, ObservableObject {
 
 @available(iOS 16.0, *)
 extension BrowserViewModel: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if activeTab?.webView == webView {
+            isLoading = true
+            loadError = nil
+            canGoBack = webView.canGoBack
+            canGoForward = webView.canGoForward
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if activeTab?.webView == webView {
+            isLoading = false
+            let nsError = error as NSError
+            // NSURLErrorCancelled (-999) is triggered by normal navigations; ignore it
+            if nsError.code != NSURLErrorCancelled {
+                loadError = error.localizedDescription
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if activeTab?.webView == webView {
+            isLoading = false
+            let nsError = error as NSError
+            if nsError.code != NSURLErrorCancelled {
+                loadError = error.localizedDescription
+            }
+        }
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if TrackerBlocker.shared.shouldBlock(request: navigationAction.request) {
             decisionHandler(.cancel)
@@ -186,6 +246,8 @@ extension BrowserViewModel: WKNavigationDelegate {
                 urlString = webView.url?.absoluteString ?? ""
                 canGoBack = webView.canGoBack
                 canGoForward = webView.canGoForward
+                isLoading = false
+                loadError = nil
             }
 
             if let url = webView.url?.absoluteString {

@@ -6,6 +6,7 @@ struct BrowserWebView: UIViewRepresentable {
     let webView: WKWebView
 
     func makeUIView(context: Context) -> WKWebView {
+        webView.translatesAutoresizingMaskIntoConstraints = false
         return webView
     }
 
@@ -17,6 +18,7 @@ struct BrowserWebView: NSViewRepresentable {
     let webView: WKWebView
 
     func makeNSView(context: Context) -> WKWebView {
+        webView.translatesAutoresizingMaskIntoConstraints = false
         return webView
     }
 

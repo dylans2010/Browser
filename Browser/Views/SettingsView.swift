@@ -113,38 +113,63 @@ struct SettingsView: View {
                 }) {
                     Label("Add Divider", systemImage: "plus.circle")
                 }
+                Button(role: .destructive, action: {
+                    toolbarManager.resetToDefaults()
+                }) {
+                    Label("Reset to Defaults", systemImage: "arrow.counterclockwise")
+                }
             } header: {
                 Text("Toolbar Customization")
             } footer: {
-                Text("You can reorder tools and dividers by dragging them.")
+                Text("Toggle tools on/off, drag to reorder. Reset clears saved preferences.")
             }
 
-            Section {
-                ForEach(toolbarManager.availableTools) { tool in
-                    HStack {
-                        Image(systemName: tool.icon)
-                            .frame(width: 30)
-                        Text(tool.title)
-                        Spacer()
-                        if tool.actionType != .divider {
-                            Toggle("", isOn: Binding(
-                                get: { tool.isEnabled },
-                                set: { _ in toolbarManager.toggleToolVisibility(id: tool.id) }
-                            ))
-                        } else {
+            ForEach(ToolCategory.allCases, id: \.self) { category in
+                let categoryTools = toolbarManager.availableTools.filter { $0.category == category }
+                if !categoryTools.isEmpty {
+                    Section(category.rawValue) {
+                        ForEach(categoryTools) { tool in
+                            HStack {
+                                Image(systemName: tool.icon)
+                                    .frame(width: 30)
+                                    .foregroundColor(tool.isEnabled ? .primary : .secondary)
+                                Text(tool.title)
+                                    .foregroundColor(tool.isEnabled ? .primary : .secondary)
+                                Spacer()
+                                if tool.actionType != .divider {
+                                    Toggle("", isOn: Binding(
+                                        get: { tool.isEnabled },
+                                        set: { _ in toolbarManager.toggleToolVisibility(id: tool.id) }
+                                    ))
+                                }
+                            }
+                        }
+                        .onMove(perform: toolbarManager.reorderTools)
+                    }
+                }
+            }
+
+            // Dividers (not in any category)
+            let dividers = toolbarManager.availableTools.filter { $0.actionType == .divider }
+            if !dividers.isEmpty {
+                Section("Dividers") {
+                    ForEach(dividers) { tool in
+                        HStack {
+                            Image(systemName: tool.icon).frame(width: 30)
+                            Text(tool.title)
+                            Spacer()
                             Button(role: .destructive) {
                                 if let index = toolbarManager.availableTools.firstIndex(where: { $0.id == tool.id }) {
                                     toolbarManager.availableTools.remove(at: index)
                                     toolbarManager.saveTools()
                                 }
                             } label: {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
+                                Image(systemName: "trash").foregroundColor(.red)
                             }
                         }
                     }
+                    .onMove(perform: toolbarManager.reorderTools)
                 }
-                .onMove(perform: toolbarManager.reorderTools)
             }
         }
         .tabItem { Label("Toolbar", systemImage: "hammer") }
