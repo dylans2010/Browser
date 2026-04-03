@@ -63,7 +63,7 @@ struct DownloadsView: View {
                 }
             }
             .navigationTitle("Downloads")
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Clear All") {
                         downloadManager.clearAll()
@@ -74,7 +74,7 @@ struct DownloadsView: View {
                         dismiss()
                     }
                 }
-            }
+            })
         }
     }
 
