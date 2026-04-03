@@ -149,8 +149,7 @@ class BrowserViewModel: NSObject, ObservableObject {
 
     func injectScripts(into webView: WKWebView, for url: URL?) {
         let contentController = webView.configuration.userContentController
-        // Clear previous scripts if necessary, but careful not to remove others
-        // For simplicity in this upgrade, we'll just add
+        contentController.removeAllUserScripts()
 
         // Ad Blocker
         let adScript = WKUserScript(source: adBlocker.getBlockingScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: true)
