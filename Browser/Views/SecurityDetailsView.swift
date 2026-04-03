@@ -2,11 +2,6 @@ import SwiftUI
 import Foundation
 import Security
 
-private let issuerNameOID = "2.5.4.3" as CFString
-private let validityNotBeforeOID = "2.5.29.16" as CFString
-private let validityNotAfterOID = "2.5.29.17" as CFString
-private let propertyValueKey = "value" as CFString
-
 struct SecurityDetails: Equatable {
     let host: String
     let isSecureConnection: Bool
@@ -87,7 +82,8 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         session.dataTask(with: secureURL).resume()
     }
 
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    @MainActor
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let trust = challenge.protectionSpace.serverTrust else {
             completionHandler(.performDefaultHandling, nil)
@@ -105,26 +101,14 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         var issuer = "Unavailable"
         var validFrom: Date?
         var validTo: Date?
-        var valuesError: Unmanaged<CFError>?
 
-        if let values = SecCertificateCopyValues(
-            cert,
-            [issuerNameOID, validityNotBeforeOID, validityNotAfterOID] as CFArray,
-            &valuesError
-        ) as? [CFString: Any] {
-            if let issuerDict = values[issuerNameOID] as? [CFString: Any],
-               let issuerValue = issuerDict[propertyValueKey] {
-                issuer = String(describing: issuerValue)
-            }
-
-            if let fromDict = values[validityNotBeforeOID] as? [CFString: Any],
-               let fromValue = fromDict[propertyValueKey] as? Date {
-                validFrom = fromValue
-            }
-
-            if let toDict = values[validityNotAfterOID] as? [CFString: Any],
-               let toValue = toDict[propertyValueKey] as? Date {
-                validTo = toValue
+        if let trustProperties = SecTrustCopyProperties(trust) as? [[CFString: Any]] {
+            for property in trustProperties {
+                guard let title = (property[kSecPropertyTypeTitle] as? String)?.lowercased() else { continue }
+                if issuer == "Unavailable", title.contains("issuer"),
+                   let value = property[kSecPropertyTypeValue] {
+                    issuer = String(describing: value)
+                }
             }
         }
 
