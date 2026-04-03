@@ -178,17 +178,14 @@ struct SettingsView: View {
         List {
             Section(
                 header: Text("Data Migration"),
-                footer: {
-                    Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
-                },
-                content: {
-                    Button(action: {
-                        showFilePicker = true
-                    }) {
-                        Label("Import From Browsers", systemImage: "square.and.arrow.down")
-                    }
+                footer: Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
+            ) {
+                Button(action: {
+                    showFilePicker = true
+                }) {
+                    Label("Import From Browsers", systemImage: "square.and.arrow.down")
                 }
-            )
+            }
         }
         .tabItem { Label("Import", systemImage: "tray.and.arrow.down") }
     }
