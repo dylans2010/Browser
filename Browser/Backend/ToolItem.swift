@@ -21,6 +21,8 @@ enum ToolActionType: String, Codable, CaseIterable {
     case extractTasks
     case viewAllTabs
     case viewPrivateTabs
+    case keyTakeaways
+    case toneAnalysis
 }
 
 struct ToolItem: Identifiable, Codable {

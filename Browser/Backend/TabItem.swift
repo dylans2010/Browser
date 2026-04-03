@@ -18,5 +18,6 @@ struct TabItem: Identifiable {
         }
 
         self.webView = WKWebView(frame: .zero, configuration: config)
+        self.webView.isFindInteractionEnabled = true
     }
 }

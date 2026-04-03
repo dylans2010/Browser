@@ -10,9 +10,13 @@ struct SummaryView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if isLoading {
+            ZStack {
+                LinearGradient(gradient: Gradient(colors: [.blue.opacity(0.1), .purple.opacity(0.1), .pink.opacity(0.1)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .edgesIgnoringSafeArea(.all)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        if isLoading {
                         ProgressView("Analyzing page content...")
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding()
@@ -23,6 +27,7 @@ struct SummaryView: View {
                         Text(summary)
                             .font(.body)
                             .padding()
+                        }
                     }
                 }
             }

@@ -68,6 +68,7 @@ class BrowserViewModel: NSObject, ObservableObject {
         if activeTabId == id {
             activeTabId = tabs.last?.id
         }
+        saveTabs()
     }
 
     func loadURLString() {

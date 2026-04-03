@@ -74,7 +74,8 @@ class DownloadManager: ObservableObject {
     fileprivate func completeDownload(id: UUID, localURL: URL) {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             let fileName = downloads[index].fileName
-            let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            let downloadsFolder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+            let destinationURL = downloadsFolder.appendingPathComponent(fileName)
             try? FileManager.default.removeItem(at: destinationURL)
             try? FileManager.default.moveItem(at: localURL, to: destinationURL)
 
