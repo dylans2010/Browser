@@ -2,6 +2,11 @@ import SwiftUI
 import Foundation
 import Security
 
+private let issuerNameOID = "2.5.4.3" as CFString
+private let validityNotBeforeOID = "2.5.29.16" as CFString
+private let validityNotAfterOID = "2.5.29.17" as CFString
+private let propertyValueKey = "value" as CFString
+
 struct SecurityDetails: Equatable {
     let host: String
     let isSecureConnection: Bool
@@ -93,19 +98,19 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         var validTo: Date?
 
         if let cert,
-           let values = SecCertificateCopyValues(cert, [kSecOIDX509V1IssuerName, kSecOIDX509V1ValidityNotBefore, kSecOIDX509V1ValidityNotAfter] as CFArray, nil) as? [CFString: Any] {
-            if let issuerDict = values[kSecOIDX509V1IssuerName] as? [CFString: Any],
-               let issuerValue = issuerDict[kSecPropertyKeyValue] {
+           let values = SecCertificateCopyValues(cert, [issuerNameOID, validityNotBeforeOID, validityNotAfterOID] as CFArray, nil) as? [CFString: Any] {
+            if let issuerDict = values[issuerNameOID] as? [CFString: Any],
+               let issuerValue = issuerDict[propertyValueKey] {
                 issuer = String(describing: issuerValue)
             }
 
-            if let fromDict = values[kSecOIDX509V1ValidityNotBefore] as? [CFString: Any],
-               let fromValue = fromDict[kSecPropertyKeyValue] as? Date {
+            if let fromDict = values[validityNotBeforeOID] as? [CFString: Any],
+               let fromValue = fromDict[propertyValueKey] as? Date {
                 validFrom = fromValue
             }
 
-            if let toDict = values[kSecOIDX509V1ValidityNotAfter] as? [CFString: Any],
-               let toValue = toDict[kSecPropertyKeyValue] as? Date {
+            if let toDict = values[validityNotAfterOID] as? [CFString: Any],
+               let toValue = toDict[propertyValueKey] as? Date {
                 validTo = toValue
             }
         }

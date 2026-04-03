@@ -13,9 +13,16 @@ struct NewTabView: View {
         ZStack {
             VStack {
                 // Top: AddressBarView
-                AddressBarView(viewModel: browserViewModel, isFocused: $isAddressBarFocused) {
-                    loadURL()
-                }
+                AddressBarView(
+                    viewModel: browserViewModel,
+                    isFocused: $isAddressBarFocused,
+                    onCommit: { loadURL() },
+                    onSecurityTap: {},
+                    onShowToolsMenu: {},
+                    onShowShare: {},
+                    onShowBookmarks: {},
+                    onShowTabs: {}
+                )
                 .padding(.top, 40)
 
                 Spacer()
