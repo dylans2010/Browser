@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-class SearchSuggestionManager: ObservableObject {
+final class SearchSuggestionManager: ObservableObject, @unchecked Sendable {
     @Published var suggestions: [String] = []
     private var cancellables = Set<AnyCancellable>()
 
