@@ -63,7 +63,7 @@ var body: some View {
             }
         }
         .navigationTitle("Downloads")
-        .toolbar(content: {
+        .toolbar {
             ToolbarItemGroup(placement: .cancellationAction) {
                 Button("Clear All") {
                     downloadManager.clearAll()
@@ -74,7 +74,7 @@ var body: some View {
                     dismiss()
                 }
             }
-        })
+        }
     }
 }
 
