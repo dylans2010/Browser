@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct ReaderModeView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: BrowserViewModel

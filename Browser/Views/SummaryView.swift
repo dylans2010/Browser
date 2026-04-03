@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct SummaryView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var aiConfig: AIConfiguration

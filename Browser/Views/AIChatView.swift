@@ -6,6 +6,7 @@ struct Message: Identifiable {
     let content: String
 }
 
+@available(iOS 16.0, *)
 struct AIChatView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var aiConfig: AIConfiguration

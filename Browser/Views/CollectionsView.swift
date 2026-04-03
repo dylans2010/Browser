@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct CollectionsView: View {
     @EnvironmentObject var collectionsManager: CollectionsManager
     @EnvironmentObject var browserViewModel: BrowserViewModel

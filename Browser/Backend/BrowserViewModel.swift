@@ -106,6 +106,7 @@ class BrowserViewModel: NSObject, ObservableObject {
     }
 }
 
+@available(iOS 16.0, *)
 extension BrowserViewModel: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if TrackerBlocker.shared.shouldBlock(request: navigationAction.request) {

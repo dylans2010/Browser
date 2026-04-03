@@ -53,10 +53,16 @@ struct PrivateTabsView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "eye.slash.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(.secondary)
-                .symbolEffect(.pulse)
+            if #available(iOS 17.0, *) {
+                Image(systemName: "eye.slash.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.secondary)
+                    .symbolEffect(.pulse)
+            } else {
+                Image(systemName: "eye.slash.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.secondary)
+            }
             Text("Private Tabs")
                 .font(.title2.bold())
             Text("Pages you view in private tabs won't appear in your history and won't leave traces like cookies after you close them.")
@@ -96,40 +102,38 @@ struct PrivateTabsView: View {
     }
 
     private var lockView: some View {
-                    VStack(spacing: 20) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 48))
-                        Text("Private Browsing Locked")
-                            .font(.title2)
+        VStack(spacing: 20) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 48))
+            Text("Private Browsing Locked")
+                .font(.title2)
 
-                        SecureField("Enter Passcode", text: $inputPasscode)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .frame(width: 200)
-                            .multilineTextAlignment(.center)
+            SecureField("Enter Passcode", text: $inputPasscode)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(width: 200)
+                .multilineTextAlignment(.center)
 
-                        Button("Unlock") {
-                            if inputPasscode == storedPasscode {
-                                isUnlocked = true
-                            } else {
-                                showError = true
-                                inputPasscode = ""
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        if showError {
-                            Text("Incorrect Passcode")
-                                .foregroundColor(.red)
-                                .font(.caption)
-                        }
-                    }
-                    .padding()
+            Button("Unlock") {
+                if inputPasscode == storedPasscode {
+                    isUnlocked = true
+                } else {
+                    showError = true
+                    inputPasscode = ""
                 }
             }
+            .buttonStyle(.borderedProminent)
+
+            if showError {
+                Text("Incorrect Passcode")
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
         }
+        .padding()
     }
 }
 
+@available(iOS 16.0, *)
 struct PrivateTabCard: View {
     let tab: TabItem
     let isActive: Bool

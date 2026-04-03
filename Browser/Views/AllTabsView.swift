@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct AllTabsView: View {
     @ObservedObject var viewModel: BrowserViewModel
     @Environment(\.dismiss) var dismiss
