@@ -90,15 +90,24 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
             return
         }
 
-        let cert = SecTrustGetCertificateAtIndex(trust, 0)
-        let commonName = cert.flatMap { SecCertificateCopySubjectSummary($0) as String? } ?? "Unavailable"
+        guard let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+              let cert = certificates.first else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        let commonName = SecCertificateCopySubjectSummary(cert) as String? ?? "Unavailable"
 
         var issuer = "Unavailable"
         var validFrom: Date?
         var validTo: Date?
+        var valuesError: Unmanaged<CFError>?
 
-        if let cert,
-           let values = SecCertificateCopyValues(cert, [issuerNameOID, validityNotBeforeOID, validityNotAfterOID] as CFArray, nil) as? [CFString: Any] {
+        if let values = SecCertificateCopyValues(
+            cert,
+            [issuerNameOID, validityNotBeforeOID, validityNotAfterOID] as CFArray,
+            &valuesError
+        ) as? [CFString: Any] {
             if let issuerDict = values[issuerNameOID] as? [CFString: Any],
                let issuerValue = issuerDict[propertyValueKey] {
                 issuer = String(describing: issuerValue)
