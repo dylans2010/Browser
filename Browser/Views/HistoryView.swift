@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct HistoryView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var historyManager: HistoryManager

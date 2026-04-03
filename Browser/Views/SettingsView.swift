@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct SettingsView: View {
     @AppStorage("Default-URL") var DefaultURL = ""
     @AppStorage("homePageBackgroundStyle") var backgroundStyle: String = "Blurred Camera"
@@ -46,7 +47,7 @@ struct SettingsView: View {
     private var generalSettings: some View {
         VStack {
             List {
-                Section("Default URL") {
+                Section("Default URL", content: {
                     VStack {
                         TextField("e.g. https://example.com", text: $DefaultURL)
                             .disabled(saveLastURL)
@@ -60,8 +61,8 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Toggle("Save Last URL", isOn: $saveLastURL)
-                }
-                Section ("New Tab Page") {
+                })
+                Section("New Tab Page", content: {
                     Picker ("Background", selection: $backgroundStyle) {
                         Text("Still Image").tag("Still Image")
                         Text("Blurred Camera").tag("Blurred Camera")
@@ -73,10 +74,10 @@ struct SettingsView: View {
                         TextField("Image URL", text: $ImageURL)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                     }
-                }
-                Section ("More") {
+                })
+                Section("More", content: {
                     Toggle("Enable Shake Menu", isOn: $shakeable)
-                }
+                })
             }
         }
         .tabItem { Label("General", systemImage: "gear") }
@@ -84,7 +85,7 @@ struct SettingsView: View {
 
     private var appearanceSettings: some View {
         List {
-            Section("Address Bar Style") {
+            Section("Address Bar Style", content: {
                 Picker("Style", selection: $addressBarStyle) {
                     Text("Liquid Glass").tag("Liquid Glass")
                     Text("Modern").tag("Modern")
@@ -95,7 +96,7 @@ struct SettingsView: View {
                     Text("Bottom").tag("Bottom")
                     Text("Compact").tag("Compact")
                 }
-            }
+            })
         }
         .tabItem { Label("Appearance", systemImage: "paintbrush") }
     }
@@ -147,10 +148,10 @@ struct SettingsView: View {
 
     private var aiSettings: some View {
         List {
-            Section("OpenRouter API") {
+            Section("OpenRouter API", content: {
                 SecureField("API Key", text: $aiConfig.apiKey)
-            }
-            Section("AI Model") {
+            })
+            Section("AI Model", content: {
                 Picker("Select Model", selection: $aiConfig.selectedModel) {
                     Text("GPT-4o Mini").tag("openai/gpt-4o-mini")
                     Text("Claude 3 Haiku").tag("anthropic/claude-3-haiku")
@@ -158,32 +159,36 @@ struct SettingsView: View {
                 }
                 TextField("Custom Model ID", text: $aiConfig.customModel)
                     .disableAutocorrection(true)
-            }
+            })
         }
         .tabItem { Label("AI", systemImage: "brain") }
     }
 
     private var privateBrowsingSettings: some View {
         List {
-            Section("Security") {
+            Section("Security", content: {
                 SecureField("Set Passcode", text: $privatePasscode)
                 Toggle("Save Data While Private", isOn: $saveDataWhilePrivate)
-            }
+            })
         }
         .tabItem { Label("Private", systemImage: "hand.raised") }
     }
 
     private var importSettings: some View {
         List {
-            Section("Data Migration") {
-                Button(action: {
-                    showFilePicker = true
-                }) {
-                    Label("Import From Browsers", systemImage: "square.and.arrow.down")
+            Section(
+                "Data Migration",
+                content: {
+                    Button(action: {
+                        showFilePicker = true
+                    }) {
+                        Label("Import From Browsers", systemImage: "square.and.arrow.down")
+                    }
+                },
+                footer: {
+                    Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
                 }
-            } footer: {
-                Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
-            }
+            )
         }
         .tabItem { Label("Import", systemImage: "tray.and.arrow.down") }
     }
@@ -200,14 +205,14 @@ struct SettingsView: View {
 
     private var experimentalSettings: some View {
         List {
-            Section("URL-Bar Movement") {
+            Section("URL-Bar Movement", content: {
                 Toggle("Enable Movement", isOn: $urlBarMovable)
                 Toggle("Quick Reset Overlay", isOn: $quickPositionReset)
                 Button("Reset Position") {
                     offsetX = 0
                     offsetY = 0
                 }
-            }
+            })
         }
         .tabItem { Label("Experimental", systemImage: "sparkles") }
     }

@@ -307,6 +307,7 @@ struct AddressBarTextField: UIViewRepresentable {
 }
 #endif
 
+@available(iOS 16.0, *)
 extension BrowserView {
     private func loadURL() {
         var input = browserViewModel.urlString.trimmingCharacters(in: .whitespacesAndNewlines)

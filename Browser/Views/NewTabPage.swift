@@ -4,6 +4,7 @@ import Cocoa
 #endif
 import AVFoundation
 
+@available(iOS 16.0, *)
 struct NewTabPage: View {
     @State private var image: Image? = nil
     @AppStorage("homePageBackgroundStyle") var backgroundStyle: String = "Blurred Camera"
