@@ -2,6 +2,14 @@ import Foundation
 import WebKit
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+typealias PlatformImage = UIImage
+#elseif os(macOS)
+import AppKit
+typealias PlatformImage = NSImage
+#endif
+
 @available(iOS 16.0, *)
 class TabItem: Identifiable, Codable {
     var id = UUID()
@@ -10,6 +18,7 @@ class TabItem: Identifiable, Codable {
     var isEphemeral: Bool = false
     var groupId: UUID?
     var createdAt: Date = Date()
+    var snapshot: PlatformImage?
 
     var webView: WKWebView = WKWebView()
 
