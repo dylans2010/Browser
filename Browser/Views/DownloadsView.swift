@@ -64,16 +64,14 @@ struct DownloadsView: View {
             }
             .navigationTitle("Downloads")
             .toolbar {
-                Group {
-                    ToolbarItemGroup(placement: .cancellationAction) {
-                        Button("Clear All") {
-                            downloadManager.clearAll()
-                        }
+                ToolbarItemGroup(placement: .cancellationAction) {
+                    Button("Clear All") {
+                        downloadManager.clearAll()
                     }
-                    ToolbarItemGroup(placement: .confirmationAction) {
-                        Button("Done") {
-                            dismiss()
-                        }
+                }
+                ToolbarItemGroup(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
                     }
                 }
             }
