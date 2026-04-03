@@ -2,7 +2,8 @@ import SwiftUI
 
 @available(iOS 16.0, *)
 struct DeveloperToolsView: View {
-    let domInfo: InspectElementTool.DOMInfo
+    let domInfo: InspectElementTool.DOMInfo?
+    let pageURL: String?
 
     @EnvironmentObject var browserViewModel: BrowserViewModel
     @ObservedObject var networkInspector = NetworkInspector.shared
@@ -11,13 +12,14 @@ struct DeveloperToolsView: View {
         NavigationView {
             List {
                 Section("Page") {
-                    row(label: "Title", value: domInfo.title.isEmpty ? "—" : domInfo.title)
-                    row(label: "Charset", value: domInfo.charset.isEmpty ? "—" : domInfo.charset)
-                    row(label: "Elements", value: "\(domInfo.tagCount)")
-                    row(label: "Scripts", value: "\(domInfo.scriptCount)")
-                    row(label: "Links", value: "\(domInfo.linkCount)")
-                    row(label: "Images", value: "\(domInfo.imageCount)")
-                    row(label: "Iframes", value: "\(domInfo.iframeCount)")
+                    row(label: "URL", value: pageURL ?? "—")
+                    row(label: "Title", value: (domInfo?.title).flatMap { $0.isEmpty ? nil : $0 } ?? "—")
+                    row(label: "Charset", value: (domInfo?.charset).flatMap { $0.isEmpty ? nil : $0 } ?? "—")
+                    row(label: "Elements", value: "\(domInfo?.tagCount ?? 0)")
+                    row(label: "Scripts", value: "\(domInfo?.scriptCount ?? 0)")
+                    row(label: "Links", value: "\(domInfo?.linkCount ?? 0)")
+                    row(label: "Images", value: "\(domInfo?.imageCount ?? 0)")
+                    row(label: "Iframes", value: "\(domInfo?.iframeCount ?? 0)")
                 }
 
                 Section("Console") {
