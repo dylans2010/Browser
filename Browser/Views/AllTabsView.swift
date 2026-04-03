@@ -12,14 +12,23 @@ struct AllTabsView: View {
                     ForEach(viewModel.tabs) { tab in
                         VStack {
                             ZStack(alignment: .topTrailing) {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.secondary.opacity(0.2))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        Text(tab.title)
-                                            .font(.caption)
-                                            .padding(8)
-                                    )
+                                if let snapshot = tab.snapshot {
+                                    Image(uiImage: snapshot)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(height: 120)
+                                        .cornerRadius(12)
+                                        .clipped()
+                                } else {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.secondary.opacity(0.2))
+                                        .frame(height: 120)
+                                        .overlay(
+                                            Text(tab.title)
+                                                .font(.caption)
+                                                .padding(8)
+                                        )
+                                }
 
                                 Button(action: {
                                     viewModel.removeTab(id: tab.id)
@@ -45,6 +54,14 @@ struct AllTabsView: View {
             }
             .navigationTitle("All Tabs")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        viewModel.addTab()
+                        dismiss()
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }

@@ -57,6 +57,9 @@ class BrowserViewModel: NSObject, ObservableObject {
 
     func removeTab(id: UUID) {
         if let tab = tabs.first(where: { $0.id == id }) {
+            tab.webView.navigationDelegate = nil
+            tab.webView.stopLoading()
+
             if tab.isEphemeral {
                 let saveDataWhilePrivate = UserDefaults.standard.bool(forKey: "saveDataWhilePrivate")
                 if saveDataWhilePrivate {
@@ -69,6 +72,13 @@ class BrowserViewModel: NSObject, ObservableObject {
         if activeTabId == id {
             activeTabId = tabs.last?.id
         }
+
+        // Ensure we always have a base state
+        if tabs.isEmpty {
+            activeTabId = nil
+            urlString = ""
+        }
+
         saveTabs()
     }
 
@@ -155,8 +165,22 @@ extension BrowserViewModel: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let index = tabs.firstIndex(where: { $0.webView == webView }) {
+            let tabId = tabs[index].id
             tabs[index].url = webView.url
             tabs[index].title = webView.title ?? "Untitled"
+
+            // Capture Snapshot
+            let config = WKSnapshotConfiguration()
+            config.rect = webView.bounds
+            webView.takeSnapshot(with: config) { image, error in
+                if let image = image {
+                    DispatchQueue.main.async {
+                        if let updatedIndex = self.tabs.firstIndex(where: { $0.id == tabId }) {
+                            self.tabs[updatedIndex].snapshot = image
+                        }
+                    }
+                }
+            }
 
             if activeTabId == tabs[index].id {
                 urlString = webView.url?.absoluteString ?? ""

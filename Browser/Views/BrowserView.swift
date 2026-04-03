@@ -7,6 +7,7 @@ import AppKit
 @available(iOS 16.0, *)
 struct BrowserView: View {
     @StateObject var browserViewModel = BrowserViewModel()
+    @StateObject var suggestionService = SearchSuggestionService()
     @EnvironmentObject var aiConfig: AIConfiguration
     @EnvironmentObject var notesManager: NotesManager
     @EnvironmentObject var ttsManager: TTSManager
@@ -46,6 +47,10 @@ struct BrowserView: View {
         ZStack {
             mainContentView
             
+            if isAddressBarFocused && !suggestionService.suggestions.isEmpty {
+                suggestionsOverlay
+            }
+
             if !hideURLbar {
                 addressBarOverlay
             }
@@ -68,7 +73,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showSummary) {
             SummaryView(viewModel: browserViewModel)
                 .environmentObject(aiConfig)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showAIChat) { AIChatView(viewModel: browserViewModel).environmentObject(aiConfig) }
         .sheet(isPresented: $showReaderMode) { ReaderModeView(viewModel: browserViewModel) }
@@ -84,6 +89,13 @@ struct BrowserView: View {
         .onChange(of: downloadManager.showDownloadsUI) { show in
             if show { showDownloads = true; downloadManager.showDownloadsUI = false }
         }
+        .onChange(of: browserViewModel.urlString) { newValue in
+            if isAddressBarFocused {
+                Task {
+                    await suggestionService.fetchSuggestions(for: newValue)
+                }
+            }
+        }
     }
 
     private var mainContentView: some View {
@@ -96,6 +108,48 @@ struct BrowserView: View {
                     .environmentObject(browserViewModel)
             }
         }
+    }
+
+    private var suggestionsOverlay: some View {
+        VStack {
+            if addressBarPosition == "Top" {
+                Spacer().frame(height: 100)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(suggestionService.suggestions, id: \.self) { suggestion in
+                        Button(action: {
+                            browserViewModel.urlString = suggestion
+                            loadURL()
+                            isAddressBarFocused = false
+                        }) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.secondary)
+                                Text(suggestion)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: "arrow.up.left")
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color.primary.opacity(0.001))
+                        }
+                        Divider()
+                    }
+                }
+                .background(.ultraThinMaterial)
+                .cornerRadius(15)
+                .padding()
+            }
+            .frame(maxHeight: 300)
+
+            if addressBarPosition == "Bottom" {
+                Spacer().frame(height: 100)
+            }
+        }
+        .zIndex(10)
     }
 
     private var addressBarOverlay: some View {
@@ -118,45 +172,57 @@ struct BrowserView: View {
     }
 
     private var addressBarView: some View {
-        HStack {
+        HStack(spacing: 12) {
             Button(action: { browserViewModel.goBack() }) {
                 Image(systemName: "chevron.left")
-            }.disabled(!browserViewModel.canGoBack)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .disabled(!browserViewModel.canGoBack)
+            .foregroundColor(.primary)
 
             VStack(spacing: 0) {
                 if addressBarDisplayMode != "Full URL" {
                     Text(addressBarDisplayText)
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
 
                 #if os(iOS)
                 AddressBarTextField(text: $browserViewModel.urlString, isFocused: $isAddressBarFocused, onCommit: loadURL)
-                    .frame(height: 20)
+                    .frame(height: 18)
+                    .font(.system(size: 14))
                 #else
                 TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
                     loadURL()
                 })
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.center)
+                .font(.system(size: 14))
                 .focused($isAddressBarFocused)
                 .submitLabel(.go)
                 #endif
             }
-            .padding(10)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
             .background(addressBarBackground)
 
             Menu {
                 toolbarMenuItems
             } label: {
-                Image(systemName: "ellipsis.circle.fill")
-                    .font(.title2)
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(8)
+                    .background(Circle().fill(Color.primary.opacity(0.1)))
             }
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
         .background(addressBarWrapperBackground)
-        .cornerRadius(addressBarStyle == "Classic" ? 0 : 20)
+        .clipShape(addressBarStyle == "Classic" ? AnyShape(Rectangle()) : AnyShape(Capsule()))
+        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+        .transition(.move(edge: addressBarPosition == "Top" ? .top : .bottom).combined(with: .opacity))
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hideURLbar)
     }
 
     private var addressBarDisplayText: String {
@@ -179,6 +245,8 @@ struct BrowserView: View {
                 )
             } else if addressBarStyle == "Modern" {
                 RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1))
+            } else if addressBarStyle == "Liquid Glass" {
+                RoundedRectangle(cornerRadius: 10).fill(.ultraThinMaterial)
             } else {
                 RoundedRectangle(cornerRadius: 0).stroke(Color.gray, lineWidth: 1)
             }
@@ -253,15 +321,23 @@ struct AddressBarTextField: UIViewRepresentable {
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
         textField.keyboardType = .webSearch
+        textField.font = UIFont.systemFont(ofSize: 14)
         return textField
     }
 
     func updateUIView(_ uiView: UITextField, context: Context) {
-        uiView.text = text
+        if uiView.text != text {
+            uiView.text = text
+        }
+
         if isFocused {
-            uiView.becomeFirstResponder()
+            if !uiView.isFirstResponder {
+                uiView.becomeFirstResponder()
+            }
         } else {
-            uiView.resignFirstResponder()
+            if uiView.isFirstResponder {
+                uiView.resignFirstResponder()
+            }
         }
     }
 

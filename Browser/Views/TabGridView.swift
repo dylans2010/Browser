@@ -17,18 +17,27 @@ struct TabGridView: View {
                     ForEach(viewModel.tabs) { tab in
                         VStack {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.1))
-                                    .aspectRatio(3/4, contentMode: .fit)
+                                if let snapshot = tab.snapshot {
+                                    Image(uiImage: snapshot)
+                                        .resizable()
+                                        .aspectRatio(3/4, contentMode: .fill)
+                                        .frame(maxWidth: .infinity)
+                                        .cornerRadius(12)
+                                        .clipped()
+                                } else {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.gray.opacity(0.1))
+                                        .aspectRatio(3/4, contentMode: .fit)
+
+                                    Text(tab.title)
+                                        .font(.caption)
+                                        .padding(8)
+                                }
 
                                 if tab.id == viewModel.activeTabId {
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(Color.blue, lineWidth: 3)
                                 }
-
-                                Text(tab.title)
-                                    .font(.caption)
-                                    .padding(8)
                             }
                             .onTapGesture {
                                 viewModel.activeTabId = tab.id
