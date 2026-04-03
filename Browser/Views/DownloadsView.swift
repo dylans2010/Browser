@@ -1,11 +1,66 @@
 import SwiftUI
 
 struct DownloadsView: View {
-@EnvironmentObject var downloadManager: DownloadManager
-@Environment(\.dismiss) var dismiss
+    @EnvironmentObject var downloadManager: DownloadManager
+    @Environment(\.dismiss) private var dismiss
 
-var body: some View {
-    NavigationView {
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            if downloadManager.downloads.isEmpty {
+                emptyState
+            } else {
+                downloadsList
+            }
+        }
+        .background(Color(.systemBackground))
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text("Downloads")
+                .font(.title2.weight(.semibold))
+
+            Spacer()
+
+            Button("Clear All") {
+                downloadManager.clearAll()
+            }
+            .disabled(downloadManager.downloads.isEmpty)
+
+            Button("Done") {
+                dismiss()
+            }
+            .fontWeight(.semibold)
+        }
+        .padding(.horizontal)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .background(
+            Color(.systemBackground)
+                .shadow(color: Color.black.opacity(0.08), radius: 2, y: 1)
+        )
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle")
+                .font(.system(size: 36))
+                .foregroundColor(.secondary)
+
+            Text("No downloads yet")
+                .font(.headline)
+
+            Text("Files you download will appear here.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private var downloadsList: some View {
         List {
             ForEach(downloadManager.downloads) { item in
                 HStack {
@@ -62,28 +117,17 @@ var body: some View {
                 .padding(.vertical, 4)
             }
         }
-        .navigationTitle("Downloads")
-        .toolbar {
-            ToolbarItemGroup(placement: .cancellationAction) {
-                Button("Clear All") {
-                    downloadManager.clearAll()
-                }
-            }
-            ToolbarItemGroup(placement: .confirmationAction) {
-                Button("Done") {
-                    dismiss()
-                }
-            }
+        .listStyle(.plain)
+    }
+
+    private func statusColor(_ status: DownloadStatus) -> Color {
+        switch status {
+        case .downloading:
+            return .blue
+        case .completed:
+            return .green
+        case .failed:
+            return .red
         }
     }
-}
-
-private func statusColor(_ status: DownloadStatus) -> Color {
-    switch status {
-    case .downloading: return .blue
-    case .completed: return .green
-    case .failed: return .red
-    }
-}
-
 }
