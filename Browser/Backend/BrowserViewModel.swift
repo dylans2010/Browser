@@ -247,7 +247,6 @@ extension BrowserViewModel: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let index = tabs.firstIndex(where: { $0.webView == webView }) {
-            let tabId = tabs[index].id
             tabs[index].url = webView.url
             tabs[index].title = webView.title ?? "Untitled"
 
