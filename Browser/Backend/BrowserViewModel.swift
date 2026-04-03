@@ -120,6 +120,19 @@ class BrowserViewModel: NSObject, ObservableObject {
         isLoading = false
     }
 
+    func closeOtherTabs() {
+        guard let activeId = activeTabId else { return }
+        let otherTabs = tabs.filter { $0.id != activeId }
+        for tab in otherTabs {
+            removeTab(id: tab.id)
+        }
+    }
+
+    func duplicateTab() {
+        guard let activeTab = activeTab else { return }
+        addTab(url: activeTab.url)
+    }
+
     func injectScripts(into webView: WKWebView, for url: URL?) {
         let contentController = webView.configuration.userContentController
         // Clear previous scripts if necessary, but careful not to remove others

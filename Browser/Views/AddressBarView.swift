@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 
+@available(iOS 16.0, *)
 struct AddressBarView: View {
     @ObservedObject var viewModel: BrowserViewModel
     @FocusState.Binding var isFocused: Bool
