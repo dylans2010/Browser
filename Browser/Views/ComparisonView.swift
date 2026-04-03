@@ -68,14 +68,16 @@ struct ComparisonView: View {
             .navigationBarTitleDisplayMode(.inline)
 #endif
             .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if !comparisonResult.isEmpty {
-                        Button("Reset") {
-                            comparisonResult = ""
-                            selectedTabIds = []
+                Group {
+                    ToolbarItemGroup(placement: .cancellationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        if !comparisonResult.isEmpty {
+                            Button("Reset") {
+                                comparisonResult = ""
+                                selectedTabIds = []
+                            }
                         }
                     }
                 }
