@@ -32,7 +32,7 @@ struct ReaderModeView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar(content: {
+            .toolbar {
                 Group {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close") { dismiss() }
@@ -63,7 +63,7 @@ struct ReaderModeView: View {
                         }
                     }
                 }
-            })
+            }
             .onAppear {
                 Task {
                     content = await viewModel.extractPageContent()

@@ -55,7 +55,7 @@ struct SummaryView: View {
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
-            .toolbar(content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
                         UIPasteboard.general.string = cleanSummary
@@ -68,7 +68,7 @@ struct SummaryView: View {
                         dismiss()
                     }
                 }
-            })
+            }
         }
         .onAppear {
             summarizePage()
