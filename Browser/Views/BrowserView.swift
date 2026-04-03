@@ -433,7 +433,7 @@ struct BrowserView: View {
         Group {
             Menu("Address Bar Styles") {
                 Picker("Display Mode", selection: $addressBarDisplayMode) {
-                    Text("Formatted URL").tag("Full URL")
+                    Text("Full URL").tag("Full URL")
                     Text("Page Title").tag("Page Title")
                     Text("Full Domain").tag("Full Domain")
                 }

@@ -29,6 +29,10 @@ struct SettingsView: View {
     @State private var showExportSheet = false
     @State private var exportURL: URL?
 
+    private var toolbarDividers: [ToolItem] {
+        toolbarManager.availableTools.filter { $0.actionType == .divider }
+    }
+
     var body: some View {
         TabView {
             generalSettings
@@ -150,10 +154,9 @@ struct SettingsView: View {
             }
 
             // Dividers (not in any category)
-            let dividers = toolbarManager.availableTools.filter { $0.actionType == .divider }
-            if !dividers.isEmpty {
+            if !toolbarDividers.isEmpty {
                 Section("Dividers") {
-                    ForEach(dividers) { tool in
+                    ForEach(toolbarDividers) { tool in
                         HStack {
                             Image(systemName: tool.icon).frame(width: 30)
                             Text(tool.title)

@@ -24,27 +24,13 @@ struct URLFormatter {
             result = String(result[result.startIndex..<hashRange.lowerBound])
         }
 
-        // Keep domain + at most one path component (strip query string from display)
-        // Split on "/" to get path components
+        // Keep domain + at most one path component
         let parts = result.components(separatedBy: "/")
-
-        // Strip query string from the last kept component
         if parts.count > 1 {
-            var secondPart = parts[1]
-            if let qmark = secondPart.range(of: "?") {
-                secondPart = String(secondPart[secondPart.startIndex..<qmark.lowerBound])
-            }
-            if secondPart.isEmpty {
-                result = parts[0]
-            } else {
-                result = parts[0] + "/" + secondPart
-            }
+            let secondPart = stripQueryString(from: parts[1])
+            result = secondPart.isEmpty ? parts[0] : parts[0] + "/" + secondPart
         } else {
-            // Only domain, strip query string
-            if let qmark = result.range(of: "?") {
-                result = String(result[result.startIndex..<qmark.lowerBound])
-            }
-            // Strip trailing slash
+            result = stripQueryString(from: result)
             if result.hasSuffix("/") {
                 result = String(result.dropLast())
             }
@@ -56,5 +42,14 @@ struct URLFormatter {
     /// Returns true if the URL uses HTTPS.
     static func isSecure(_ urlString: String) -> Bool {
         return urlString.lowercased().hasPrefix("https://")
+    }
+
+    // MARK: - Private helpers
+
+    private static func stripQueryString(from string: String) -> String {
+        if let qmark = string.range(of: "?") {
+            return String(string[string.startIndex..<qmark.lowerBound])
+        }
+        return string
     }
 }
