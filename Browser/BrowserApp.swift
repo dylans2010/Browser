@@ -10,6 +10,7 @@ struct BrowserApp: App {
     @StateObject private var toolbarManager = ToolbarManager()
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var collectionsManager = CollectionsManager()
+    @StateObject private var saveForLaterManager = SaveForLaterManager()
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +24,7 @@ struct BrowserApp: App {
                     .environmentObject(toolbarManager)
                     .environmentObject(favoritesManager)
                     .environmentObject(collectionsManager)
+                    .environmentObject(saveForLaterManager)
             } else {
                 Text("Browser requires iOS 16.0 or newer.")
             }

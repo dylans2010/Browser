@@ -48,7 +48,7 @@ class ToolbarManager: ObservableObject {
         ToolItem(title: "Tone Analysis", icon: "waveform.path.ecg", actionType: .toneAnalysis, category: .ai, requiresWebView: true),
         ToolItem(title: "Extract Tasks", icon: "checklist", actionType: .extractTasks, category: .ai, requiresWebView: true),
         // Advanced
-        ToolItem(title: "Inspect Element", icon: "hammer", actionType: .inspectElement, category: .advanced, requiresWebView: true),
+        ToolItem(title: "Developer Tools", icon: "hammer", actionType: .inspectElement, category: .advanced, requiresWebView: true),
         ToolItem(title: "View Network Logs", icon: "network", actionType: .viewNetworkLogs, category: .advanced),
         ToolItem(title: "Switch User Agent", icon: "desktopcomputer", actionType: .switchUserAgent, category: .advanced, requiresWebView: true),
         // Favorites

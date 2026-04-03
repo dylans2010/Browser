@@ -27,6 +27,7 @@ struct AddressBarView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
                 }
 
                 TextField("Search or enter URL", text: $viewModel.urlString)
@@ -39,6 +40,10 @@ struct AddressBarView: View {
                     .onSubmit {
                         onCommit()
                     }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isFocused = true
             }
 
             // Trailing: Reload / Stop button

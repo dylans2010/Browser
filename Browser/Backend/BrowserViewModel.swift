@@ -11,10 +11,13 @@ class BrowserViewModel: NSObject, ObservableObject {
     @Published var canGoForward = false
     @Published var isLoading = false
     @Published var loadError: String? = nil
+    @Published var isHideElementsModeEnabled = false
+    @Published var consoleLogs: [String] = []
 
     var historyManager: HistoryManager?
     var downloadManager: DownloadManager?
     var adBlocker = AdBlocker.shared
+    var networkInspector = NetworkInspector.shared
     var elementHiderManager: ElementHiderManager?
     var websiteStyleManager: WebsiteStyleManager?
 
@@ -57,6 +60,7 @@ class BrowserViewModel: NSObject, ObservableObject {
         let newTab = TabItem(url: url, isEphemeral: isEphemeral)
         newTab.webView.navigationDelegate = self
         newTab.webView.configuration.userContentController.add(self, name: "elementHider")
+        newTab.webView.configuration.userContentController.add(self, name: "devConsole")
 
         injectScripts(into: newTab.webView, for: url)
 
@@ -71,6 +75,7 @@ class BrowserViewModel: NSObject, ObservableObject {
         if let tab = tabs.first(where: { $0.id == id }) {
             tab.webView.navigationDelegate = nil
             tab.webView.configuration.userContentController.removeScriptMessageHandler(forName: "elementHider")
+            tab.webView.configuration.userContentController.removeScriptMessageHandler(forName: "devConsole")
             tab.webView.stopLoading()
 
             if tab.isEphemeral {
@@ -95,6 +100,15 @@ class BrowserViewModel: NSObject, ObservableObject {
         guard let activeTab = activeTab, let url = URL(string: urlString) else { return }
         loadError = nil
         activeTab.webView.load(URLRequest(url: url))
+    }
+
+    func activateTab(id: UUID) {
+        guard let tab = tabs.first(where: { $0.id == id }) else { return }
+        activeTabId = id
+        urlString = tab.url?.absoluteString ?? ""
+        canGoBack = tab.webView.canGoBack
+        canGoForward = tab.webView.canGoForward
+        loadError = nil
     }
 
     func goBack() {
@@ -164,6 +178,44 @@ class BrowserViewModel: NSObject, ObservableObject {
 
         // Also inject existing scripts
         ScriptManager.shared.injectScripts(into: webView, for: url)
+
+        let consoleHookScript = """
+        (function() {
+            if (window.__devConsoleHooked) return;
+            window.__devConsoleHooked = true;
+            const methods = ['log', 'info', 'warn', 'error', 'debug'];
+            methods.forEach(function(level) {
+                const original = console[level];
+                console[level] = function() {
+                    const message = Array.from(arguments).map(function(arg) {
+                        try {
+                            return typeof arg === 'string' ? arg : JSON.stringify(arg);
+                        } catch (_) {
+                            return String(arg);
+                        }
+                    }).join(' ');
+                    window.webkit.messageHandlers.devConsole.postMessage(level.toUpperCase() + ': ' + message);
+                    original.apply(console, arguments);
+                };
+            });
+        })();
+        """
+        contentController.addUserScript(WKUserScript(source: consoleHookScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+    }
+
+    func enableHideElementsMode(using manager: ElementHiderManager) {
+        guard let webView = activeTab?.webView else { return }
+        isHideElementsModeEnabled = true
+        webView.evaluateJavaScript(manager.getSelectionScript())
+    }
+
+    func disableHideElementsMode() {
+        isHideElementsModeEnabled = false
+        activeTab?.webView.evaluateJavaScript("if (window.__elementHiderCleanup) { window.__elementHiderCleanup(); }")
+    }
+
+    func clearConsoleLogs() {
+        consoleLogs.removeAll()
     }
 
     func extractPageContent() async -> String {
@@ -220,7 +272,13 @@ extension BrowserViewModel: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if isHideElementsModeEnabled {
+            decisionHandler(.cancel)
+            return
+        }
+
         if let url = navigationAction.request.url {
+            networkInspector.logRequest(url: url.absoluteString, method: navigationAction.request.httpMethod ?? "GET", status: 0)
             if adBlocker.shouldBlock(url: url) {
                 decisionHandler(.cancel)
                 return
@@ -246,6 +304,13 @@ extension BrowserViewModel: WKScriptMessageHandler {
             if let domain = activeTab?.url?.host {
                 elementHiderManager?.hideElement(selector: selector, for: domain)
                 reload() // Reload to apply
+            }
+        } else if message.name == "devConsole", let log = message.body as? String {
+            DispatchQueue.main.async {
+                self.consoleLogs.append(log)
+                if self.consoleLogs.count > 500 {
+                    self.consoleLogs.removeFirst(self.consoleLogs.count - 500)
+                }
             }
         }
     }

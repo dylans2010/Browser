@@ -16,6 +16,7 @@ struct BrowserView: View {
     @EnvironmentObject var toolbarManager: ToolbarManager
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var collectionsManager: CollectionsManager
+    @EnvironmentObject var saveForLaterManager: SaveForLaterManager
 
     @FocusState private var isAddressBarFocused: Bool
 
@@ -33,17 +34,19 @@ struct BrowserView: View {
     @State private var showAIResult = false
     @State private var showFindOnPage = false
     @State private var showNetworkLogs = false
-    @State private var showInspectElement = false
+    @State private var showDeveloperTools = false
     @State private var showPageSource = false
     @State private var showAddToCollection = false
     @State private var showPDFShare = false
     @State private var showWebsiteStyle = false
+    @State private var showBookmarks = false
+    @State private var showSaveForLater = false
 
     // Data for sheets
     @State private var aiResultTitle = ""
     @State private var aiResultContent = ""
     @State private var aiResultLoading = false
-    @State private var inspectDOMInfo: InspectElementTool.DOMInfo? = nil
+    @State private var developerDOMInfo: InspectElementTool.DOMInfo? = nil
     @State private var pageSourceContent = ""
     @State private var pdfURL: URL? = nil
 
@@ -115,13 +118,20 @@ struct BrowserView: View {
         .sheet(isPresented: $showAddNote) { NoteAddView(sourceURL: browserViewModel.urlString) }
         .sheet(isPresented: $showAIResult) { AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading) }
         .sheet(isPresented: $showNetworkLogs) { NetworkLogsView() }
-        .sheet(isPresented: $showInspectElement) {
-            if let info = inspectDOMInfo { InspectElementView(domInfo: info) }
+        .sheet(isPresented: $showDeveloperTools) {
+            if let info = developerDOMInfo { DeveloperToolsView(domInfo: info) }
         }
         .sheet(isPresented: $showPageSource) { ViewPageSourceView(source: pageSourceContent) }
         .sheet(isPresented: $showAddToCollection) { addToCollectionSheet }
+        .sheet(isPresented: $showBookmarks) { BookmarksView() }
+        .sheet(isPresented: $showSaveForLater) { SaveForLaterView() }
         .sheet(isPresented: $showWebsiteStyle) {
-            if let domain = browserViewModel.activeTab?.url?.host { WebsiteStyleView(domain: domain) }
+            if let domain = browserViewModel.activeTab?.url?.host {
+                WebsiteStyleView(domain: domain)
+            } else {
+                Text("Open a website first.")
+                    .padding()
+            }
         }
         .onAppear {
             browserViewModel.historyManager = historyManager
@@ -202,12 +212,16 @@ struct BrowserView: View {
                     Label("Add Note", systemImage: "note.text.badge.plus")
                 }
                 Button(action: {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        HideElementsTool.execute(webView: webView, elementHiderManager: elementHiderManager)
-                    }
+                    browserViewModel.enableHideElementsMode(using: elementHiderManager)
                 }) {
                     Label("Hide Elements", systemImage: "eye.slash")
                 }
+                Button(action: {
+                    browserViewModel.disableHideElementsMode()
+                }) {
+                    Label("Stop Hiding Elements", systemImage: "escape")
+                }
+                .disabled(!browserViewModel.isHideElementsModeEnabled)
                 Button(action: {
                     if let webView = browserViewModel.activeTab?.webView {
                         RevertToOriginalTool.execute(url: browserViewModel.activeTab?.url, elementHiderManager: elementHiderManager, webView: webView)
@@ -249,7 +263,13 @@ struct BrowserView: View {
             Group {
                 Button(action: { showFindOnPage = true }) { Label("Find On Page", systemImage: "doc.text.magnifyingglass") }
                 Button(action: { showReaderMode = true }) { Label("Reader Mode", systemImage: "text.justify.left") }
-                Button(action: { showInspectElement = true }) { Label("Inspect Element", systemImage: "hammer") }
+                Button(action: {
+                    guard let webView = browserViewModel.activeTab?.webView else { return }
+                    InspectElementTool.inspect(webView: webView) { info in
+                        developerDOMInfo = info
+                        showDeveloperTools = true
+                    }
+                }) { Label("Developer Tools", systemImage: "hammer") }
                 Button(action: { showNetworkLogs = true }) { Label("Network Logs", systemImage: "network") }
             }
 
@@ -258,6 +278,14 @@ struct BrowserView: View {
             // General
             Group {
                 Button(action: { showAllTabs = true }) { Label("All Tabs", systemImage: "square.on.square") }
+                Button(action: {
+                    favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
+                }) { Label("Bookmark This Page", systemImage: "bookmark") }
+                Button(action: { showBookmarks = true }) { Label("Bookmarks", systemImage: "book") }
+                Button(action: {
+                    saveForLaterManager.add(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
+                }) { Label("Save For Later", systemImage: "bookmark.circle") }
+                Button(action: { showSaveForLater = true }) { Label("Saved For Later", systemImage: "clock.arrow.circlepath") }
                 Button(action: { showDownloads = true }) { Label("Downloads", systemImage: "arrow.down.circle") }
                 Button(action: { showHistory = true }) { Label("History", systemImage: "clock") }
                 Button(action: { showSettings = true }) { Label("Settings", systemImage: "gear") }
