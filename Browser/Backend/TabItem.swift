@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 
+@available(iOS 16.0, *)
 struct TabItem: Identifiable {
     let id = UUID()
     var url: URL?

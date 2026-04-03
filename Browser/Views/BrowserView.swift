@@ -4,6 +4,7 @@ import WebKit
 import AppKit
 #endif
 
+@available(iOS 16.0, *)
 struct BrowserView: View {
     @StateObject var browserViewModel = BrowserViewModel()
     @EnvironmentObject var aiConfig: AIConfiguration
