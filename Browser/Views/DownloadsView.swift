@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DownloadsView: View {
 @EnvironmentObject var downloadManager: DownloadManager
-@Environment(.dismiss) var dismiss
+@Environment(\.dismiss) var dismiss
 
 var body: some View {
     NavigationView {
