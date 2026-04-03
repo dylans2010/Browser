@@ -1,5 +1,6 @@
 import Foundation
 import WebKit
+import SwiftUI
 
 @available(iOS 16.0, *)
 struct TabItem: Identifiable {
@@ -7,6 +8,7 @@ struct TabItem: Identifiable {
     var url: URL?
     var title: String = "New Tab"
     var webView: WKWebView
+    var snapshot: UIImage?
     var isEphemeral: Bool = false
 
     init(url: URL? = nil, isEphemeral: Bool = false) {

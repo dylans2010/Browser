@@ -7,6 +7,7 @@ struct Collection: Identifiable, Codable {
     var color: String // Hex string
     var sfSymbol: String
     var urls: [String]
+    var createdAt: Date = Date()
 }
 
 class CollectionsManager: ObservableObject {

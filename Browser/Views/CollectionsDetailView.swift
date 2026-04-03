@@ -31,11 +31,17 @@ struct CollectionsDetailView: View {
                     }) {
                         HStack {
                             Image(systemName: "link")
-                            Text(urlString)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading) {
+                                Text(urlString)
+                                    .font(.body)
+                                    .lineLimit(1)
+                                Text(URL(string: urlString)?.host ?? "")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
+                        .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
                 }

@@ -24,6 +24,10 @@ struct SettingsView: View {
     @EnvironmentObject var toolbarManager: ToolbarManager
     @EnvironmentObject var historyManager: HistoryManager
     @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var collectionsManager: CollectionsManager
+
+    @State private var showExportSheet = false
+    @State private var exportURL: URL?
 
     var body: some View {
         TabView {
@@ -178,27 +182,47 @@ struct SettingsView: View {
         List {
             Section(
                 header: Text("Data Migration"),
-                footer: Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
+                footer: Text("Import/Export bookmarks, history, and collections.")
             ) {
                 Button(action: {
                     showFilePicker = true
                 }) {
-                    Label("Import From Browsers", systemImage: "square.and.arrow.down")
+                    Label("Import Data", systemImage: "square.and.arrow.down")
+                }
+
+                Button(action: {
+                    if let url = MigrationManager.shared.exportToJSON() {
+                        exportURL = url
+                        showExportSheet = true
+                    }
+                }) {
+                    Label("Export Data", systemImage: "square.and.arrow.up")
                 }
             }
         }
-        .tabItem { Label("Import", systemImage: "tray.and.arrow.down") }
+        .tabItem { Label("Migration", systemImage: "tray.and.arrow.down") }
+        .sheet(isPresented: $showExportSheet) {
+            if let url = exportURL {
+                ActivityView(activityItems: [url])
+            }
+        }
     }
 
     private func importData(from url: URL) {
-        // Implementation of the import logic. For now, we simulate a successful import.
-        // In a real scenario, we would unzip and parse the content.
-        print("Importing from \(url.lastPathComponent)")
-
-        // Placeholder logic:
-        // favoritesManager.addFavorite(...)
-        // historyManager.addToHistory(...)
+        MigrationManager.shared.importFromJSON(at: url, historyManager: historyManager, favoritesManager: favoritesManager, collectionsManager: collectionsManager)
     }
+
+struct ActivityView: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
 
     private var experimentalSettings: some View {
         List {

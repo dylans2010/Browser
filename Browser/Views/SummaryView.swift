@@ -40,7 +40,7 @@ struct SummaryView: View {
                             .padding()
                         } else {
                             GroupBox {
-                                Text(LocalizedStringKey(summary))
+                                Text(cleanSummary)
                                     .font(.body)
                                     .padding(5)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,6 +56,13 @@ struct SummaryView: View {
             .navigationBarTitleDisplayMode(.inline)
 #endif
             .toolbar(content: {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        UIPasteboard.general.string = cleanSummary
+                    }) {
+                        Image(systemName: "doc.on.doc")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
@@ -66,6 +73,16 @@ struct SummaryView: View {
         .onAppear {
             summarizePage()
         }
+    }
+
+    private var cleanSummary: String {
+        var text = summary
+        // Very basic markdown stripping:
+        text = text.replacingOccurrences(of: "\\*\\*", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\*", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "#", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "`", with: "", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func summarizePage() {

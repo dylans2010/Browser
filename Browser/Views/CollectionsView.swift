@@ -31,6 +31,10 @@ struct CollectionsView: View {
                                 Text("\(collection.urls.count) Tabs")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+
+                                Text("Updated \(collection.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
