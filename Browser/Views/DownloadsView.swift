@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct DownloadsView: View {
     @EnvironmentObject var downloadManager: DownloadManager
     @Environment(\.dismiss) private var dismiss
