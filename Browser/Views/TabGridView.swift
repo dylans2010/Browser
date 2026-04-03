@@ -60,7 +60,7 @@ struct TabGridView: View {
                 .padding()
             }
             .navigationTitle("Tabs")
-            .toolbar(content: {
+            .toolbar {
                 Group {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close") { dismiss() }
@@ -71,7 +71,7 @@ struct TabGridView: View {
                         }
                     }
                 }
-            })
+            }
         }
     }
 }
