@@ -46,7 +46,6 @@ struct BrowserView: View {
     @State private var aiResultTitle = ""
     @State private var aiResultContent = ""
     @State private var aiResultLoading = false
-    @State private var developerDOMInfo: InspectElementTool.DOMInfo? = nil
     @State private var pageSourceContent = ""
     @State private var pdfURL: URL? = nil
 
@@ -73,14 +72,10 @@ struct BrowserView: View {
 
             // Suggestions overlay
             if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
-                VStack {
-                    Spacer().frame(height: 100)
-                    SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
-                        browserViewModel.urlString = selected
-                        loadURL()
-                        isAddressBarFocused = false
-                    }
-                    Spacer()
+                SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
+                    browserViewModel.urlString = selected
+                    loadURL()
+                    isAddressBarFocused = false
                 }
                 .zIndex(10)
             }
@@ -119,14 +114,19 @@ struct BrowserView: View {
         .sheet(isPresented: $showAIResult) { AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading) }
         .sheet(isPresented: $showNetworkLogs) { NetworkLogsView() }
         .sheet(isPresented: $showDeveloperTools) {
-            if let info = developerDOMInfo { DeveloperToolsView(domInfo: info) }
+            if let webView = browserViewModel.activeTab?.webView {
+                DeveloperToolsView(webView: webView)
+            } else {
+                Text("Open a website first.")
+                    .padding()
+            }
         }
         .sheet(isPresented: $showPageSource) { ViewPageSourceView(source: pageSourceContent) }
         .sheet(isPresented: $showAddToCollection) { addToCollectionSheet }
         .sheet(isPresented: $showBookmarks) { BookmarksView() }
         .sheet(isPresented: $showSaveForLater) { SaveForLaterView() }
         .sheet(isPresented: $showWebsiteStyle) {
-            if let domain = browserViewModel.activeTab?.url?.host {
+            if let domain = websiteStyleManager.normalizedDomain(from: browserViewModel.activeTab?.url?.host) {
                 WebsiteStyleView(domain: domain)
             } else {
                 Text("Open a website first.")
@@ -264,11 +264,7 @@ struct BrowserView: View {
                 Button(action: { showFindOnPage = true }) { Label("Find On Page", systemImage: "doc.text.magnifyingglass") }
                 Button(action: { showReaderMode = true }) { Label("Reader Mode", systemImage: "text.justify.left") }
                 Button(action: {
-                    guard let webView = browserViewModel.activeTab?.webView else { return }
-                    InspectElementTool.inspect(webView: webView) { info in
-                        developerDOMInfo = info
-                        showDeveloperTools = true
-                    }
+                    showDeveloperTools = true
                 }) { Label("Developer Tools", systemImage: "hammer") }
                 Button(action: { showNetworkLogs = true }) { Label("Network Logs", systemImage: "network") }
             }

@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import UIKit
 
 @available(iOS 16.0, *)
 struct AddressBarView: View {
@@ -8,6 +9,7 @@ struct AddressBarView: View {
 
     var onCommit: () -> Void
     var menuItems: AnyView?
+    @State private var isReloadAnimating = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -44,6 +46,7 @@ struct AddressBarView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 isFocused = true
+                selectAllAddressText()
             }
 
             // Trailing: Reload / Stop button
@@ -58,6 +61,13 @@ struct AddressBarView: View {
                     Image(systemName: viewModel.isLoading ? "xmark" : "arrow.clockwise")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(isReloadAnimating ? 360 : 0))
+                        .animation(
+                            viewModel.isLoading
+                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                            : .default,
+                            value: isReloadAnimating
+                        )
                 }
             }
 
@@ -81,6 +91,9 @@ struct AddressBarView: View {
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
         .padding(.horizontal)
+        .onChange(of: viewModel.isLoading) { isLoading in
+            isReloadAnimating = isLoading
+        }
     }
 
     private var displayURLText: String {
@@ -88,5 +101,13 @@ struct AddressBarView: View {
             return "Search or enter URL"
         }
         return URLFormatter.formatted(viewModel.urlString)
+    }
+}
+
+private extension AddressBarView {
+    func selectAllAddressText() {
+        DispatchQueue.main.async {
+            UIApplication.shared.sendAction(#selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil)
+        }
     }
 }
