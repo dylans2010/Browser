@@ -1,6 +1,6 @@
 import Foundation
 
-class SearchSuggestionService: ObservableObject {
+final class SearchSuggestionService: ObservableObject, @unchecked Sendable {
     @Published var suggestions: [String] = []
 
     func fetchSuggestions(for query: String) async {
