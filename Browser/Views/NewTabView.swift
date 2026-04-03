@@ -16,43 +16,33 @@ struct NewTabView: View {
             backgroundLayer
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 40) {
-                    // Top Spacer for AddressBar area
-                    Spacer().frame(height: 100)
-
+                VStack(spacing: 30) {
                     headerSection
 
-                    // Body: Favorites grid
+                    searchSection
+
+                    HStack(spacing: 15) {
+                        weatherWidget
+                        newsWidget
+                    }
+                    .padding(.horizontal)
+
                     favoritesSection
 
-                    // Optional: Recent searches
                     recentSearchesSection
 
-                    Spacer().frame(height: 100)
+                    Spacer().frame(height: 50)
                 }
-                .padding(.horizontal)
+                .padding(.top, 60)
             }
 
-            // AddressBar at top
-            VStack {
-                AddressBarView(viewModel: browserViewModel, isFocused: $isAddressBarFocused) {
-                    loadURL()
-                }
-                .padding(.top, 20)
-                .background(
-                    LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemBackground).opacity(0.8), Color(UIColor.systemBackground).opacity(0)]), startPoint: .top, endPoint: .bottom)
-                        .edgesIgnoringSafeArea(.top)
-                )
-                Spacer()
-            }
-
-            // Tapping AddressBar → presents SearchSuggestionsView
             if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
                 SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
                     browserViewModel.urlString = selected
                     loadURL()
                     isAddressBarFocused = false
                 }
+                .background(.ultraThinMaterial)
                 .zIndex(10)
             }
         }
@@ -82,14 +72,60 @@ struct NewTabView: View {
 
     private var headerSection: some View {
         VStack(spacing: 8) {
-            Image(systemName: "safari.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(LinearGradient(colors: [.blue, .cyan], startPoint: .top, endPoint: .bottom))
-                .shadow(radius: 5)
-
-            Text("Good Morning") // Could be dynamic
-                .font(.title.bold())
+            Text(greeting)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .padding(.top, 20)
         }
+    }
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 12 { return "Good Morning" }
+        if hour < 18 { return "Good Afternoon" }
+        return "Good Evening"
+    }
+
+    private var searchSection: some View {
+        AddressBarView(viewModel: browserViewModel, isFocused: $isAddressBarFocused) {
+            loadURL()
+        }
+        .padding(.horizontal)
+    }
+
+    private var weatherWidget: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Image(systemName: "sun.max.fill")
+                    .foregroundColor(.yellow)
+                Text("72°")
+                    .font(.title2.bold())
+            }
+            Text("Sunny")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text("San Francisco")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .cornerRadius(20)
+    }
+
+    private var newsWidget: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Top News")
+                .font(.caption.bold())
+                .foregroundColor(.blue)
+            Text("New breakthrough in energy...")
+                .font(.system(size: 14, weight: .medium))
+                .lineLimit(2)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .cornerRadius(20)
     }
 
     private var favoritesSection: some View {

@@ -8,13 +8,19 @@ struct AddressBarView: View {
     @FocusState.Binding var isFocused: Bool
 
     var onCommit: () -> Void
-    var menuItems: AnyView?
+    var menuItems: AnyView? = nil
 
     @AppStorage("addressBarAlignment") var alignment: String = "Center"
     @AppStorage("addressBarSize") var barSize: Double = 1.0 // Scale factor
     @AppStorage("showSiteIcon") var showSiteIcon: Bool = true
     @AppStorage("showReadTime") var showReadTime: Bool = true
     @AppStorage("addressBarGestures") var enableGestures: Bool = true
+
+    // Fine tuning
+    @AppStorage("addressBarCornerRadius") var barCornerRadius: Double = 25.0
+    @AppStorage("addressBarShadowRadius") var barShadowRadius: Double = 10.0
+    @AppStorage("addressBarOpacity") var barOpacity: Double = 1.0
+    @AppStorage("addressBarBlur") var barBlurIntensity: Double = 1.0
 
     @EnvironmentObject var toolbarManager: ToolbarManager
 
@@ -109,9 +115,10 @@ struct AddressBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8 * barSize)
             .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+                RoundedRectangle(cornerRadius: barCornerRadius)
+                    .fill(.ultraThinMaterial.opacity(barBlurIntensity))
+                    .opacity(barOpacity)
+                    .shadow(color: Color.black.opacity(0.1), radius: barShadowRadius, x: 0, y: 5)
             )
             .scaleEffect(barSize)
 

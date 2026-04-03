@@ -68,7 +68,10 @@ class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
     }
 
     private func loadPersistedTabs() {
-        if let data = UserDefaults.standard.data(forKey: "persisted_tabs_json"),
+        let startupPage = UserDefaults.standard.string(forKey: "startupPage") ?? "New Tab"
+
+        if startupPage == "Last Page",
+           let data = UserDefaults.standard.data(forKey: "persisted_tabs_json"),
            let decoded = try? JSONDecoder().decode([TabItem].self, from: data) {
             tabs = decoded
             for index in tabs.indices {
@@ -81,11 +84,14 @@ class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
             }
             activeTabId = tabs.last?.id
         } else {
+            // Default to New Tab or a specific Default URL
+            tabs = []
             let defaultURL = UserDefaults.standard.string(forKey: "Default-URL") ?? ""
             if !defaultURL.isEmpty {
                 addTab(url: URL(string: defaultURL))
             } else {
                 activeTabId = nil
+                urlString = ""
             }
         }
     }
@@ -298,6 +304,14 @@ class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
         }
         saveTabGroups()
         saveTabs()
+    }
+
+    func updateTabGroup(id: UUID, name: String, color: String) {
+        if let index = tabGroups.firstIndex(where: { $0.id == id }) {
+            tabGroups[index].name = name
+            tabGroups[index].color = color
+            saveTabGroups()
+        }
     }
 }
 

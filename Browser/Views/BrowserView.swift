@@ -41,6 +41,7 @@ struct BrowserView: View {
     @State private var showWebsiteStyle = false
     @State private var showBookmarks = false
     @State private var showSaveForLater = false
+    @State private var showLanguageSelection = false
 
     // Data for sheets
     @State private var aiResultTitle = ""
@@ -90,10 +91,10 @@ struct BrowserView: View {
                         onCommit: { loadURL() },
                         menuItems: AnyView(toolbarMenuItems)
                     )
-                    .padding(.bottom, isAddressBarFocused ? 10 : 40)
+                    .padding(.bottom, isAddressBarFocused ? 20 : 40)
                 }
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .animation(.easeOut(duration: 0.25), value: isAddressBarFocused)
+                .padding(.bottom, isAddressBarFocused ? 0 : 0) // Ensures it follows keyboard naturally
+                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isAddressBarFocused)
             }
         }
         .findNavigator(isPresented: $showFindOnPage)
@@ -187,6 +188,14 @@ struct BrowserView: View {
                 }
             }
             .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showLanguageSelection) {
+            LanguageSelectionView { targetLanguage in
+                if let webView = browserViewModel.activeTab?.webView {
+                    TranslateSiteTool.execute(in: webView, targetLanguage: targetLanguage)
+                }
+            }
+            .presentationDetents([.medium])
         }
         .onAppear {
             browserViewModel.historyManager = historyManager
@@ -298,9 +307,7 @@ struct BrowserView: View {
                     Label("Website Styling", systemImage: "paintpalette")
                 }
                 Button(action: {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        TranslateSiteTool.execute(in: webView)
-                    }
+                    showLanguageSelection = true
                 }) {
                     Label("Translate Site", systemImage: "translate")
                 }

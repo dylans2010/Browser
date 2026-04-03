@@ -30,6 +30,15 @@ struct SettingsView: View {
     @AppStorage("showReadTime") var showReadTime: Bool = true
     @AppStorage("addressBarGestures") var addressBarGestures: Bool = true
 
+    // Address Bar Fine Tuning
+    @AppStorage("addressBarCornerRadius") var addressBarCornerRadius: Double = 25.0
+    @AppStorage("addressBarShadowRadius") var addressBarShadowRadius: Double = 10.0
+    @AppStorage("addressBarOpacity") var addressBarOpacity: Double = 1.0
+    @AppStorage("addressBarBlur") var addressBarBlur: Double = 1.0 // 0 to 1
+
+    // Startup
+    @AppStorage("startupPage") var startupPage: String = "New Tab"
+
     @EnvironmentObject var aiConfig: AIConfiguration
     @EnvironmentObject var toolbarManager: ToolbarManager
     @EnvironmentObject var historyManager: HistoryManager
@@ -66,6 +75,13 @@ struct SettingsView: View {
     private var generalSettings: some View {
         VStack {
             List {
+                Section("Startup Behavior") {
+                    Picker("On Launch Open", selection: $startupPage) {
+                        Text("New Tab").tag("New Tab")
+                        Text("Last Open Page").tag("Last Page")
+                    }
+                }
+
                 Section("Default URL", content: {
                     VStack {
                         TextField("e.g. https://example.com", text: $DefaultURL)
@@ -79,7 +95,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Toggle("Save Last URL", isOn: $saveLastURL)
+                    Toggle("Save Last URL (Deprecated)", isOn: $saveLastURL)
                 })
                 Section("New Tab Page", content: {
                     Picker ("Background", selection: $backgroundStyle) {
@@ -132,6 +148,26 @@ struct SettingsView: View {
                 Toggle("Show Site Icon", isOn: $showSiteIcon)
                 Toggle("Show Read Time", isOn: $showReadTime)
                 Toggle("Enable Swipe Gestures", isOn: $addressBarGestures)
+
+                VStack(alignment: .leading) {
+                    Text("Corner Radius: \(Int(addressBarCornerRadius))")
+                    Slider(value: $addressBarCornerRadius, in: 0...40, step: 1)
+                }
+
+                VStack(alignment: .leading) {
+                    Text("Shadow Radius: \(Int(addressBarShadowRadius))")
+                    Slider(value: $addressBarShadowRadius, in: 0...30, step: 1)
+                }
+
+                VStack(alignment: .leading) {
+                    Text("Opacity: \(Int(addressBarOpacity * 100))%")
+                    Slider(value: $addressBarOpacity, in: 0.2...1.0, step: 0.05)
+                }
+
+                VStack(alignment: .leading) {
+                    Text("Blur Intensity: \(Int(addressBarBlur * 100))%")
+                    Slider(value: $addressBarBlur, in: 0...1, step: 0.1)
+                }
             })
 
             Section("Search Engine") {
