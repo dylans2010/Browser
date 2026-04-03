@@ -13,15 +13,19 @@ struct BrowserApp: App {
 
     var body: some Scene {
         WindowGroup {
-            BrowserView()
-                .environmentObject(aiConfig)
-                .environmentObject(notesManager)
-                .environmentObject(ttsManager)
-                .environmentObject(historyManager)
-                .environmentObject(downloadManager)
-                .environmentObject(toolbarManager)
-                .environmentObject(favoritesManager)
-                .environmentObject(collectionsManager)
+            if #available(iOS 16.0, *) {
+                BrowserView()
+                    .environmentObject(aiConfig)
+                    .environmentObject(notesManager)
+                    .environmentObject(ttsManager)
+                    .environmentObject(historyManager)
+                    .environmentObject(downloadManager)
+                    .environmentObject(toolbarManager)
+                    .environmentObject(favoritesManager)
+                    .environmentObject(collectionsManager)
+            } else {
+                Text("Browser requires iOS 16.0 or newer.")
+            }
         }
 #if os(macOS)
         Settings {
