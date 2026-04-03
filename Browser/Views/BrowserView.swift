@@ -18,9 +18,8 @@ struct BrowserView: View {
     @AppStorage("addressBarPosition") var addressBarPosition: String = "Bottom"
     @AppStorage("Save-Last-URL") var saveLastURL = false
     @AppStorage("Default-URL") var DefaultURL = ""
-    @AppStorage("Movable URL-Bar") var urlBarMovable = false
-    @AppStorage("OFFSET_X") var offsetX: Double = 0
-    @AppStorage("OFFSET_Y") var offsetY: Double = 0
+    @AppStorage("addressBarDisplayMode") var addressBarDisplayMode: String = "Full URL"
+    @AppStorage("addressBarTheme") var addressBarTheme: String = "Glass"
     
     @State private var hideURLbar = false
     @State private var showSettings = false
@@ -33,11 +32,12 @@ struct BrowserView: View {
     @State private var showAIChat = false
     @State private var showReaderMode = false
     @State private var showNotes = false
+    @State private var showAIResult = false
+    @State private var aiResultTitle = ""
+    @State private var aiResultContent = ""
+    @State private var aiResultLoading = false
 
     @State private var showFindOnPage = false
-    @State private var findQuery = ""
-
-    var offset: CGSize { CGSize(width: offsetX, height: offsetY) }
 
     var body: some View {
         ZStack {
@@ -46,20 +46,32 @@ struct BrowserView: View {
             if !hideURLbar {
                 addressBarOverlay
             }
-
-            if showFindOnPage {
-                findOnPageOverlay
-            }
         }
+        .findNavigator(isPresented: $showFindOnPage)
+        .environmentObject(browserViewModel)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showDownloads) { DownloadsView() }
-        .sheet(isPresented: $showHistory) { HistoryView(historyManager: historyManager) }
+        .sheet(isPresented: $showDownloads) {
+            DownloadsView()
+                .presentationDetents([.fraction(0.3), .medium])
+        }
+        .sheet(isPresented: $showHistory) {
+            HistoryView(historyManager: historyManager)
+                .environmentObject(browserViewModel)
+        }
         .sheet(isPresented: $showAllTabs) { AllTabsView(viewModel: browserViewModel) }
         .sheet(isPresented: $showPrivateTabs) { PrivateTabsView(viewModel: browserViewModel) }
-        .sheet(isPresented: $showSummary) { SummaryView(viewModel: browserViewModel).environmentObject(aiConfig) }
+        .sheet(isPresented: $showSummary) {
+            SummaryView(viewModel: browserViewModel)
+                .environmentObject(aiConfig)
+                .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showAIChat) { AIChatView(viewModel: browserViewModel).environmentObject(aiConfig) }
         .sheet(isPresented: $showReaderMode) { ReaderModeView(viewModel: browserViewModel) }
         .sheet(isPresented: $showNotes) { NotesView(notesManager: notesManager) }
+        .sheet(isPresented: $showAIResult) {
+            AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading)
+                .presentationDetents([.medium, .large])
+        }
         .onAppear {
             browserViewModel.historyManager = historyManager
             browserViewModel.downloadManager = downloadManager
@@ -76,6 +88,7 @@ struct BrowserView: View {
                     .edgesIgnoringSafeArea(.all)
             } else {
                 NewTabPage()
+                    .environmentObject(browserViewModel)
             }
         }
     }
@@ -105,10 +118,20 @@ struct BrowserView: View {
                 Image(systemName: "chevron.left")
             }.disabled(!browserViewModel.canGoBack)
 
-            TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
-                loadURL()
-            })
-            .textFieldStyle(.plain)
+            VStack(spacing: 0) {
+                if addressBarDisplayMode != "Full URL" {
+                    Text(addressBarDisplayText)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
+                    loadURL()
+                })
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.center)
+            }
             .padding(10)
             .background(addressBarBackground)
 
@@ -122,17 +145,26 @@ struct BrowserView: View {
         .padding()
         .background(addressBarWrapperBackground)
         .cornerRadius(addressBarStyle == "Classic" ? 0 : 20)
-        .offset(offset)
-        .gesture(urlBarMovable ? DragGesture().onChanged { g in
-            offsetX = g.translation.width
-            offsetY = g.translation.height
-        } : nil)
+    }
+
+    private var addressBarDisplayText: String {
+        guard let activeTab = browserViewModel.activeTab else { return "" }
+        if addressBarDisplayMode == "Page Title" {
+            return activeTab.title
+        } else if addressBarDisplayMode == "Full Domain" {
+            return activeTab.url?.host ?? ""
+        }
+        return ""
     }
 
     private var addressBarBackground: some View {
         Group {
-            if addressBarStyle == "Liquid Glass" {
-                RoundedRectangle(cornerRadius: 10).fill(.ultraThinMaterial)
+            if addressBarTheme == "Glass" {
+                RoundedRectangle(cornerRadius: 15).fill(.ultraThinMaterial)
+            } else if addressBarTheme == "Colorful" {
+                RoundedRectangle(cornerRadius: 15).fill(
+                    LinearGradient(gradient: Gradient(colors: [.blue.opacity(0.3), .purple.opacity(0.3)]), startPoint: .leading, endPoint: .trailing)
+                )
             } else if addressBarStyle == "Modern" {
                 RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1))
             } else {
@@ -143,7 +175,11 @@ struct BrowserView: View {
 
     private var addressBarWrapperBackground: some View {
         Group {
-            if addressBarStyle == "Liquid Glass" {
+            if addressBarTheme == "Glass" {
+                Color.clear.background(.thinMaterial)
+            } else if addressBarTheme == "Colorful" {
+                Color.clear.background(Material.ultraThinMaterial)
+            } else if addressBarStyle == "Liquid Glass" {
                 Color.clear.background(.thinMaterial)
             } else {
                 #if os(macOS)
@@ -157,6 +193,19 @@ struct BrowserView: View {
 
     private var toolbarMenuItems: some View {
         Group {
+            Menu("Address Bar Styles") {
+                Picker("Display Mode", selection: $addressBarDisplayMode) {
+                    Text("Full URL").tag("Full URL")
+                    Text("Page Title").tag("Page Title")
+                    Text("Full Domain").tag("Full Domain")
+                }
+                Picker("Theme", selection: $addressBarTheme) {
+                    Text("Standard").tag("Standard")
+                    Text("Glass").tag("Glass")
+                    Text("Colorful").tag("Colorful")
+                }
+            }
+            Divider()
             ForEach(toolbarManager.availableTools.filter { $0.isEnabled }) { tool in
                 Button {
                     executeTool(tool)
@@ -169,32 +218,6 @@ struct BrowserView: View {
         }
     }
 
-    private var findOnPageOverlay: some View {
-        VStack {
-            HStack {
-                TextField("Find on page", text: $findQuery, onCommit: {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        FindOnPageTool.execute(in: webView, query: findQuery)
-                    }
-                })
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(width: 200)
-
-                Button("Done") {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        FindOnPageTool.clear(in: webView)
-                    }
-                    showFindOnPage = false
-                    findQuery = ""
-                }
-            }
-            .padding()
-            .background(.thinMaterial)
-            .cornerRadius(10)
-            .padding()
-            Spacer()
-        }
-    }
 
     private func loadURL() {
         var input = browserViewModel.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -255,6 +278,46 @@ struct BrowserView: View {
             }
         case .viewAllTabs: showAllTabs = true
         case .viewPrivateTabs: showPrivateTabs = true
+        case .keyTakeaways:
+            aiResultTitle = "Key Takeaways"
+            aiResultLoading = true
+            showAIResult = true
+            Task {
+                let content = await browserViewModel.extractPageContent()
+                do {
+                    let result = try await OpenRouterService.shared.fetchCompletion(
+                        apiKey: aiConfig.apiKey,
+                        model: aiConfig.currentModel,
+                        prompt: "Please provide the key takeaways from this content as a bulleted list.",
+                        context: content
+                    )
+                    aiResultContent = result
+                    aiResultLoading = false
+                } catch {
+                    aiResultContent = "Failed to fetch takeaways: \(error.localizedDescription)"
+                    aiResultLoading = false
+                }
+            }
+        case .toneAnalysis:
+            aiResultTitle = "Tone Analysis"
+            aiResultLoading = true
+            showAIResult = true
+            Task {
+                let content = await browserViewModel.extractPageContent()
+                do {
+                    let result = try await OpenRouterService.shared.fetchCompletion(
+                        apiKey: aiConfig.apiKey,
+                        model: aiConfig.currentModel,
+                        prompt: "Please analyze the tone of this content (e.g., formal, informal, optimistic, critical) and explain why.",
+                        context: content
+                    )
+                    aiResultContent = result
+                    aiResultLoading = false
+                } catch {
+                    aiResultContent = "Failed to fetch analysis: \(error.localizedDescription)"
+                    aiResultLoading = false
+                }
+            }
         }
     }
 }

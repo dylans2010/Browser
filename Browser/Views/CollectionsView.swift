@@ -48,6 +48,7 @@ struct CollectionsView: View {
             }
             .sheet(isPresented: $showCreate) {
                 CollectionsCreateView()
+                    .environmentObject(browserViewModel)
             }
         }
     }

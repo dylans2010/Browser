@@ -22,7 +22,9 @@ class ToolbarManager: ObservableObject {
         ToolItem(title: "Listen to Page", icon: "speaker.wave.2", actionType: .listenToPage),
         ToolItem(title: "Extract Tasks", icon: "checklist", actionType: .extractTasks),
         ToolItem(title: "View All Tabs", icon: "square.on.square", actionType: .viewAllTabs),
-        ToolItem(title: "View Private Tabs", icon: "eye.slash.fill", actionType: .viewPrivateTabs)
+        ToolItem(title: "View Private Tabs", icon: "eye.slash.fill", actionType: .viewPrivateTabs),
+        ToolItem(title: "Key Takeaways", icon: "list.bullet.rectangle", actionType: .keyTakeaways),
+        ToolItem(title: "Tone Analysis", icon: "waveform.path.ecg", actionType: .toneAnalysis)
     ]
 
     @Published var visibleToolIDs: [UUID] = []

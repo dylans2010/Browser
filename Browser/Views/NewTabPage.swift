@@ -44,6 +44,7 @@ struct NewTabPage: View {
         .edgesIgnoringSafeArea(.all)
         .sheet(isPresented: $showCollections) {
             CollectionsView()
+                .environmentObject(browserViewModel)
         }
     }
 
