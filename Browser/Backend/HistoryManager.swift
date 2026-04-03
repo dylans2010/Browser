@@ -25,6 +25,11 @@ class HistoryManager: ObservableObject {
         history.removeAll()
     }
 
+    func deleteHistory(inPast interval: TimeInterval) {
+        let cutoff = Date().addingTimeInterval(-interval)
+        history.removeAll { $0.date >= cutoff }
+    }
+
     private func saveHistory() {
         if let encoded = try? JSONEncoder().encode(history) {
             UserDefaults.standard.set(encoded, forKey: historyKey)

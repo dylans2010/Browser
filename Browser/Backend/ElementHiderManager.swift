@@ -41,21 +41,27 @@ class ElementHiderManager: ObservableObject {
     func getSelectionScript() -> String {
         return """
         (function() {
-            let lastEl;
+            if (window.__elementHiderActive) { return; }
+            window.__elementHiderActive = true;
+
             const style = document.createElement('style');
             style.id = 'element-hider-overlay';
-            style.innerHTML = '*:hover { outline: 2px solid red !important; }';
+            style.innerHTML = `
+                *:hover { outline: 2px solid #ff3b30 !important; cursor: crosshair !important; }
+                html, body { cursor: crosshair !important; }
+            `;
             document.head.appendChild(style);
 
-            const clickHandler = (e) => {
+            const clickHandler = function(e) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const selector = getUniqueSelector(e.target);
+                e.target.style.display = 'none';
                 window.webkit.messageHandlers.elementHider.postMessage(selector);
-                cleanup();
             };
 
-            const getUniqueSelector = (el) => {
+            const getUniqueSelector = function(el) {
                 if (el.id) return '#' + el.id;
                 if (el.className) {
                     const classes = Array.from(el.classList).join('.');
@@ -64,12 +70,35 @@ class ElementHiderManager: ObservableObject {
                 return el.tagName.toLowerCase();
             };
 
-            const cleanup = () => {
-                document.head.removeChild(style);
-                document.removeEventListener('click', clickHandler, true);
+            const blockNavigation = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
             };
 
+            const keyHandler = function(e) {
+                if (e.key === 'Escape') {
+                    cleanup();
+                }
+            };
+
+            const cleanup = function() {
+                window.__elementHiderActive = false;
+                const existingStyle = document.getElementById('element-hider-overlay');
+                if (existingStyle) {
+                    existingStyle.remove();
+                }
+                document.removeEventListener('click', clickHandler, true);
+                document.removeEventListener('auxclick', blockNavigation, true);
+                document.removeEventListener('submit', blockNavigation, true);
+                document.removeEventListener('keydown', keyHandler, true);
+            };
+
+            window.__elementHiderCleanup = cleanup;
             document.addEventListener('click', clickHandler, true);
+            document.addEventListener('auxclick', blockNavigation, true);
+            document.addEventListener('submit', blockNavigation, true);
+            document.addEventListener('keydown', keyHandler, true);
         })();
         """
     }
