@@ -3,6 +3,8 @@ import Foundation
 class AdBlocker {
     static let shared = AdBlocker()
 
+    var isEnabled = true
+
     // A simple list of known ad domains
     private let adDomains: Set<String> = [
         "doubleclick.net",
@@ -22,7 +24,7 @@ class AdBlocker {
     ]
 
     func shouldBlock(url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
+        guard isEnabled, let host = url.host?.lowercased() else { return false }
 
         for adDomain in adDomains {
             if host == adDomain || host.hasSuffix("." + adDomain) {
