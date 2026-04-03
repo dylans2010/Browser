@@ -12,4 +12,14 @@ struct JavaScriptToggleTool {
         }
         webView.reload()
     }
+
+    static func toggle(in webView: WKWebView) {
+        if #available(iOS 14.0, macOS 11.0, *) {
+            let current = webView.configuration.defaultWebpagePreferences.allowsContentJavaScript
+            execute(in: webView, isEnabled: !current)
+        } else {
+            let current = webView.configuration.preferences.javaScriptEnabled
+            execute(in: webView, isEnabled: !current)
+        }
+    }
 }

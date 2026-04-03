@@ -1,6 +1,8 @@
 import SwiftUI
 import WebKit
-#if os(macOS)
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
 import AppKit
 #endif
 
@@ -15,6 +17,7 @@ struct BrowserView: View {
     @EnvironmentObject var downloadManager: DownloadManager
     @EnvironmentObject var toolbarManager: ToolbarManager
     @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var collectionsManager: CollectionsManager
 
     @AppStorage("addressBarStyle") var addressBarStyle: String = "Modern"
     @AppStorage("addressBarPosition") var addressBarPosition: String = "Bottom"
@@ -22,7 +25,7 @@ struct BrowserView: View {
     @AppStorage("Default-URL") var DefaultURL = ""
     @AppStorage("addressBarDisplayMode") var addressBarDisplayMode: String = "Full URL"
     @AppStorage("addressBarTheme") var addressBarTheme: String = "Glass"
-    
+
     @State private var hideURLbar = false
     @State private var showSettings = false
     @State private var showDownloads = false
@@ -40,13 +43,39 @@ struct BrowserView: View {
     @State private var aiResultLoading = false
 
     @State private var showFindOnPage = false
+    @State private var showNetworkLogs = false
+    @State private var showInspectElement = false
+    @State private var inspectDOMInfo: InspectElementTool.DOMInfo? = nil
+    @State private var showPageSource = false
+    @State private var pageSourceContent = ""
+    @State private var showAddToCollection = false
+    @State private var showPDFShare = false
+    @State private var pdfURL: URL? = nil
+
     @FocusState private var isAddressBarFocused: Bool
     @State private var isEditingAddressBar = false
 
     var body: some View {
         ZStack {
             mainContentView
-            
+
+            // Loading progress bar
+            if browserViewModel.isLoading {
+                VStack {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .tint(.blue)
+                        .frame(maxWidth: .infinity)
+                    Spacer()
+                }
+                .ignoresSafeArea()
+            }
+
+            // Error overlay
+            if let error = browserViewModel.loadError {
+                errorView(message: error)
+            }
+
             if isAddressBarFocused && !suggestionService.suggestions.isEmpty {
                 suggestionsOverlay
             }
@@ -82,6 +111,29 @@ struct BrowserView: View {
             AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showNetworkLogs) {
+            NetworkLogsView()
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showInspectElement) {
+            if let info = inspectDOMInfo {
+                InspectElementView(domInfo: info)
+                    .presentationDetents([.medium])
+            }
+        }
+        .sheet(isPresented: $showPageSource) {
+            ViewPageSourceView(source: pageSourceContent)
+        }
+        .sheet(isPresented: $showAddToCollection) {
+            addToCollectionSheet
+        }
+        .sheet(isPresented: $showPDFShare) {
+#if os(iOS)
+            if let url = pdfURL {
+                ShareSheet(activityItems: [url])
+            }
+#endif
+        }
         .onAppear {
             browserViewModel.historyManager = historyManager
             browserViewModel.downloadManager = downloadManager
@@ -96,19 +148,73 @@ struct BrowserView: View {
                 }
             }
         }
+        .onChange(of: browserViewModel.activeTabId) { _ in
+            isEditingAddressBar = false
+            browserViewModel.loadError = nil
+        }
     }
+
+    // MARK: - Main Content
 
     private var mainContentView: some View {
         Group {
             if let activeTab = browserViewModel.activeTab {
                 BrowserWebView(webView: activeTab.webView)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .edgesIgnoringSafeArea(.all)
             } else {
                 NewTabPage()
                     .environmentObject(browserViewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
+
+    // MARK: - Error View
+
+    private func errorView(message: String) -> some View {
+        ZStack {
+#if os(iOS)
+            Color(UIColor.systemBackground).ignoresSafeArea()
+#else
+            Color(NSColor.windowBackgroundColor).ignoresSafeArea()
+#endif
+
+            VStack(spacing: 20) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 56))
+                    .foregroundColor(.secondary)
+
+                Text("Page Failed to Load")
+                    .font(.title2.bold())
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                HStack(spacing: 16) {
+                    Button {
+                        browserViewModel.loadError = nil
+                        browserViewModel.reload()
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        browserViewModel.loadError = nil
+                    } label: {
+                        Text("Dismiss")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+
+    // MARK: - Suggestions Overlay
 
     private var suggestionsOverlay: some View {
         VStack {
@@ -152,6 +258,8 @@ struct BrowserView: View {
         .zIndex(10)
     }
 
+    // MARK: - Address Bar Overlay
+
     private var addressBarOverlay: some View {
         VStack {
             if addressBarPosition == "Top" {
@@ -171,8 +279,11 @@ struct BrowserView: View {
         }
     }
 
+    // MARK: - Address Bar View
+
     private var addressBarView: some View {
         HStack(spacing: 12) {
+            // Back button
             Button(action: { browserViewModel.goBack() }) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
@@ -180,33 +291,72 @@ struct BrowserView: View {
             .disabled(!browserViewModel.canGoBack)
             .foregroundColor(.primary)
 
-            VStack(spacing: 0) {
-                if addressBarDisplayMode != "Full URL" {
-                    Text(addressBarDisplayText)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+            // URL input area
+            HStack(spacing: 6) {
+                // HTTPS lock / insecure indicator
+                if !browserViewModel.urlString.isEmpty {
+                    Image(systemName: URLFormatter.isSecure(browserViewModel.urlString) ? "lock.fill" : "lock.open")
+                        .font(.system(size: 11))
+                        .foregroundColor(URLFormatter.isSecure(browserViewModel.urlString) ? .green : .orange)
                 }
 
-                #if os(iOS)
-                AddressBarTextField(text: $browserViewModel.urlString, isFocused: $isAddressBarFocused, onCommit: loadURL)
+                // Display formatted URL when not editing; full URL when editing
+                if isEditingAddressBar {
+#if os(iOS)
+                    AddressBarTextField(
+                        text: $browserViewModel.urlString,
+                        isFocused: $isAddressBarFocused,
+                        onCommit: {
+                            loadURL()
+                            isEditingAddressBar = false
+                        }
+                    )
                     .frame(height: 18)
+#else
+                    TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
+                        loadURL()
+                        isEditingAddressBar = false
+                    })
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.center)
                     .font(.system(size: 14))
-                #else
-                TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
-                    loadURL()
-                })
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 14))
-                .focused($isAddressBarFocused)
-                .submitLabel(.go)
-                #endif
+                    .focused($isAddressBarFocused)
+                    .submitLabel(.go)
+#endif
+                } else {
+                    Button(action: {
+                        isEditingAddressBar = true
+                        isAddressBarFocused = true
+                    }) {
+                        Text(displayURLText)
+                            .font(.system(size: 14))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                // Reload / Stop button
+                if !browserViewModel.urlString.isEmpty {
+                    Button(action: {
+                        if browserViewModel.isLoading {
+                            browserViewModel.stopLoading()
+                        } else {
+                            browserViewModel.reload()
+                        }
+                    }) {
+                        Image(systemName: browserViewModel.isLoading ? "xmark" : "arrow.clockwise")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background(addressBarBackground)
 
+            // 3-dot menu
             Menu {
                 toolbarMenuItems
             } label: {
@@ -225,14 +375,20 @@ struct BrowserView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hideURLbar)
     }
 
-    private var addressBarDisplayText: String {
-        guard let activeTab = browserViewModel.activeTab else { return "" }
-        if addressBarDisplayMode == "Page Title" {
-            return activeTab.title
-        } else if addressBarDisplayMode == "Full Domain" {
-            return activeTab.url?.host ?? ""
+    /// Text shown in non-editing mode based on the selected display mode.
+    private var displayURLText: String {
+        if browserViewModel.urlString.isEmpty {
+            return "Search or enter URL"
         }
-        return ""
+        switch addressBarDisplayMode {
+        case "Page Title":
+            let title = browserViewModel.activeTab?.title ?? ""
+            return title.isEmpty ? URLFormatter.formatted(browserViewModel.urlString) : title
+        case "Full Domain":
+            return browserViewModel.activeTab?.url?.host ?? URLFormatter.formatted(browserViewModel.urlString)
+        default: // "Full URL" → show formatted (compact) URL
+            return URLFormatter.formatted(browserViewModel.urlString)
+        }
     }
 
     private var addressBarBackground: some View {
@@ -262,14 +418,16 @@ struct BrowserView: View {
             } else if addressBarStyle == "Liquid Glass" {
                 Color.clear.background(.thinMaterial)
             } else {
-                #if os(macOS)
+#if os(macOS)
                 Color(NSColor.windowBackgroundColor).opacity(0.9)
-                #else
+#else
                 Color(UIColor.systemBackground).opacity(0.9)
-                #endif
+#endif
             }
         }
     }
+
+    // MARK: - Toolbar Menu (grouped by category)
 
     private var toolbarMenuItems: some View {
         Group {
@@ -286,24 +444,63 @@ struct BrowserView: View {
                 }
             }
             Divider()
-            ForEach(toolbarManager.availableTools.filter { $0.isEnabled }) { tool in
-                if tool.actionType == .divider {
-                    Divider()
-                } else {
-                    Button {
-                        executeTool(tool)
-                    } label: {
-                        Label(tool.title, systemImage: tool.icon)
+
+            let enabledTools = toolbarManager.availableTools.filter { $0.isEnabled && $0.actionType != .divider }
+
+            ForEach(ToolCategory.allCases, id: \.self) { category in
+                let categoryTools = enabledTools.filter { $0.category == category }
+                if !categoryTools.isEmpty {
+                    Menu(category.rawValue) {
+                        ForEach(categoryTools) { tool in
+                            Button {
+                                executeTool(tool)
+                            } label: {
+                                Label(tool.title, systemImage: tool.icon)
+                            }
+                        }
                     }
                 }
             }
+
             Divider()
             Button("Settings", systemImage: "gear") { showSettings = true }
         }
     }
 
+    // MARK: - Add to Collection Sheet
 
+    private var addToCollectionSheet: some View {
+        NavigationView {
+            List(collectionsManager.collections) { collection in
+                Button {
+                    AddToCollectionTool.execute(
+                        url: browserViewModel.urlString,
+                        collectionId: collection.id,
+                        collectionsManager: collectionsManager
+                    )
+                    showAddToCollection = false
+                } label: {
+                    HStack {
+                        Image(systemName: collection.sfSymbol)
+                            .foregroundColor(Color(hex: collection.color))
+                        Text(collection.name)
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+            .navigationTitle("Add to Collection")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showAddToCollection = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
 }
+
+// MARK: - UIViewRepresentable Address Bar TextField
 
 #if os(iOS)
 struct AddressBarTextField: UIViewRepresentable {
@@ -381,7 +578,20 @@ struct AddressBarTextField: UIViewRepresentable {
         }
     }
 }
+
+/// Thin wrapper to present UIActivityViewController from SwiftUI.
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
 #endif
+
+// MARK: - URL Loading + Tool Execution
 
 @available(iOS 16.0, *)
 extension BrowserView {
@@ -394,32 +604,83 @@ extension BrowserView {
             input = "https://www.google.com/search?q=\(query)"
         }
         browserViewModel.urlString = input
+        isEditingAddressBar = false
+        isAddressBarFocused = false
         browserViewModel.loadURLString()
     }
-    
+
     private func executeTool(_ tool: ToolItem) {
         switch tool.actionType {
-        case .findOnPage:
-            showFindOnPage.toggle()
+
+        // NAVIGATION
+        case .back: browserViewModel.goBack()
         case .forward: browserViewModel.goForward()
         case .reload: browserViewModel.reload()
-        case .share: ShareTool.execute(url: browserViewModel.urlString)
+        case .hardRefresh: browserViewModel.hardRefresh()
+        case .stopLoading: browserViewModel.stopLoading()
+
+        // PAGE
+        case .findOnPage:
+            showFindOnPage.toggle()
+        case .scrollToTop:
+            if let webView = browserViewModel.activeTab?.webView { ScrollToTopTool.execute(in: webView) }
+        case .scrollToBottom:
+            if let webView = browserViewModel.activeTab?.webView { ScrollToBottomTool.execute(in: webView) }
+        case .readerMode: showReaderMode = true
+        case .toggleDarkMode:
+            if let webView = browserViewModel.activeTab?.webView {
+                DarkModeTool.toggle(in: webView) { _ in }
+            }
+
+        // TABS
         case .newTab: browserViewModel.addTab()
         case .newPrivateTab: browserViewModel.addTab(isEphemeral: true)
-        case .closeThisTab: if let id = browserViewModel.activeTabId { browserViewModel.removeTab(id: id) }
+        case .duplicateTab: DuplicateTabTool.execute(viewModel: browserViewModel)
+        case .closeThisTab:
+            if let id = browserViewModel.activeTabId { browserViewModel.removeTab(id: id) }
         case .closeAllTabs: CloseAllTabsTool.execute(viewModel: browserViewModel)
-        case .viewHistory: showHistory = true
-        case .viewDownloads: showDownloads = true
-        case .toggleJavaScript:
+        case .closeOtherTabs: CloseOtherTabsTool.execute(viewModel: browserViewModel)
+        case .viewAllTabs: showAllTabs = true
+        case .viewPrivateTabs: showPrivateTabs = true
+
+        // DATA
+        case .viewPageSource:
             if let webView = browserViewModel.activeTab?.webView {
-                JavaScriptToggleTool.execute(in: webView, isEnabled: false) // Toggles OFF for now
+                ViewPageSourceTool.execute(webView: webView) { src in
+                    pageSourceContent = src
+                    showPageSource = true
+                }
             }
-        case .scrollToTop: if let webView = browserViewModel.activeTab?.webView { ScrollToTopTool.execute(in: webView) }
-        case .favoritePage:
-            FavoriteTool.execute(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? "Untitled", favoritesManager: favoritesManager)
-        case .summarizePage: showSummary = true
-        case .askThePage: showAIChat = true
-        case .readerMode: showReaderMode = true
+        case .copyURL: CopyURLTool.execute(urlString: browserViewModel.urlString)
+        case .copyPageTitle:
+            CopyPageTitleTool.execute(title: browserViewModel.activeTab?.title ?? "")
+        case .saveAsPDF:
+            if let webView = browserViewModel.activeTab?.webView {
+                SaveAsPDFTool.execute(webView: webView) { url in
+                    if let url = url {
+                        pdfURL = url
+                        showPDFShare = true
+                    }
+                }
+            }
+        case .savePageOffline:
+            if let webView = browserViewModel.activeTab?.webView {
+                SavePageOfflineTool.execute(webView: webView) { url in
+                    if let url = url {
+                        pdfURL = url
+                        showPDFShare = true
+                    }
+                }
+            }
+        case .share: ShareTool.execute(url: browserViewModel.urlString)
+
+        // MEDIA
+        case .pictureInPicture:
+            if let webView = browserViewModel.activeTab?.webView { PictureInPictureTool.execute(in: webView) }
+        case .muteTab:
+            if let webView = browserViewModel.activeTab?.webView { MuteTabTool.mute(in: webView) }
+        case .unmuteTab:
+            if let webView = browserViewModel.activeTab?.webView { MuteTabTool.unmute(in: webView) }
         case .listenToPage:
             if ttsManager.isSpeaking {
                 ttsManager.stop()
@@ -429,21 +690,28 @@ extension BrowserView {
                     ttsManager.speak(content)
                 }
             }
-        case .extractTasks:
-            Task {
-                let content = await browserViewModel.extractPageContent()
-                do {
-                    let tasks = try await TaskExtractor.shared.extractTasks(from: content, apiKey: aiConfig.apiKey, model: aiConfig.currentModel)
-                    for task in tasks {
-                        notesManager.addNote(text: "TASK: \(task.title) - \(task.description)", sourceURL: browserViewModel.urlString)
-                    }
-                    showNotes = true
-                } catch {
-                    print("Task extraction failed")
-                }
+
+        // PRIVACY
+        case .toggleJavaScript:
+            if let webView = browserViewModel.activeTab?.webView {
+                JavaScriptToggleTool.toggle(in: webView)
             }
-        case .viewAllTabs: showAllTabs = true
-        case .viewPrivateTabs: showPrivateTabs = true
+        case .clearCookiesForSite:
+            if let webView = browserViewModel.activeTab?.webView {
+                ClearSiteCookiesTool.execute(for: webView) {}
+            }
+        case .clearCacheForSite:
+            if let webView = browserViewModel.activeTab?.webView {
+                ClearSiteCacheTool.execute(for: webView) {}
+            }
+        case .toggleAdBlocker:
+            if let host = browserViewModel.activeTab?.url?.host {
+                _ = ToggleAdBlockerTool.toggle(for: host)
+            }
+
+        // AI
+        case .summarizePage: showSummary = true
+        case .askThePage: showAIChat = true
         case .keyTakeaways:
             aiResultTitle = "Key Takeaways"
             aiResultLoading = true
@@ -464,7 +732,6 @@ extension BrowserView {
                     aiResultLoading = false
                 }
             }
-        case .divider: break
         case .toneAnalysis:
             aiResultTitle = "Tone Analysis"
             aiResultLoading = true
@@ -485,6 +752,50 @@ extension BrowserView {
                     aiResultLoading = false
                 }
             }
+        case .extractTasks:
+            Task {
+                let content = await browserViewModel.extractPageContent()
+                do {
+                    let tasks = try await TaskExtractor.shared.extractTasks(from: content, apiKey: aiConfig.apiKey, model: aiConfig.currentModel)
+                    for task in tasks {
+                        notesManager.addNote(text: "TASK: \(task.title) - \(task.description)", sourceURL: browserViewModel.urlString)
+                    }
+                    showNotes = true
+                } catch {
+                    print("Task extraction failed")
+                }
+            }
+
+        // ADVANCED
+        case .inspectElement:
+            if let webView = browserViewModel.activeTab?.webView {
+                InspectElementTool.inspect(webView: webView) { info in
+                    inspectDOMInfo = info
+                    showInspectElement = true
+                }
+            }
+        case .viewNetworkLogs: showNetworkLogs = true
+        case .switchUserAgent:
+            if let webView = browserViewModel.activeTab?.webView {
+                SwitchUserAgentTool.toggle(webView: webView)
+            }
+
+        // FAVORITES
+        case .favoritePage:
+            FavoriteTool.execute(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? "Untitled", favoritesManager: favoritesManager)
+        case .removeFromFavorites:
+            RemoveFromFavoritesTool.execute(url: browserViewModel.urlString, favoritesManager: favoritesManager)
+
+        // DOWNLOADS
+        case .viewDownloads: showDownloads = true
+
+        // HISTORY
+        case .viewHistory: showHistory = true
+
+        // COLLECTIONS
+        case .addToCollection: showAddToCollection = true
+
+        case .divider: break
         }
     }
 }
