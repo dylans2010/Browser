@@ -23,6 +23,7 @@ enum ToolActionType: String, Codable, CaseIterable {
     case viewPrivateTabs
     case keyTakeaways
     case toneAnalysis
+    case divider
 }
 
 struct ToolItem: Identifiable, Codable {

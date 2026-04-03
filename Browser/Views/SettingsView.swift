@@ -2,13 +2,13 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("Default-URL") var DefaultURL = ""
-    @AppStorage("Selected NewTab Config") var selectedNewTabConfig = 1
+    @AppStorage("homePageBackgroundStyle") var backgroundStyle: String = "Blurred Camera"
     @AppStorage("new-tab-bg") var ImageURL = ""
-    @AppStorage("Use-Image") var useImage = false
     @AppStorage("Save-Last-URL") var saveLastURL = false
     @AppStorage("Movable URL-Bar") var urlBarMovable = false
     @AppStorage("Quick Position Reset Overlay") var quickPositionReset = false
     @State private var useBlurredView = true
+    @State private var showFilePicker = false
     @AppStorage("Shakeable") var shakeable = true
     @AppStorage("OFFSET_X") var offsetX: Double = 0
     @AppStorage("OFFSET_Y") var offsetY: Double = 0
@@ -21,7 +21,9 @@ struct SettingsView: View {
 
     @EnvironmentObject var aiConfig: AIConfiguration
     @EnvironmentObject var toolbarManager: ToolbarManager
-    
+    @EnvironmentObject var historyManager: HistoryManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
+
     var body: some View {
         TabView {
             generalSettings
@@ -29,7 +31,15 @@ struct SettingsView: View {
             toolbarSettings
             aiSettings
             privateBrowsingSettings
+            importSettings
             experimentalSettings
+        }
+        .sheet(isPresented: $showFilePicker) {
+            FileImporterRepresentableView(allowedContentTypes: [.zip, .xml, .json], allowsMultipleSelection: false) { urls in
+                if let url = urls.first {
+                    importData(from: url)
+                }
+            }
         }
     }
 
@@ -52,11 +62,17 @@ struct SettingsView: View {
                     Toggle("Save Last URL", isOn: $saveLastURL)
                 }
                 Section ("New Tab Page") {
-                    Picker ("Background", selection: $selectedNewTabConfig) {
-                        Text("Image").tag(0)
-                        Text("Blurred Camera").tag(1)
+                    Picker ("Background", selection: $backgroundStyle) {
+                        Text("Still Image").tag("Still Image")
+                        Text("Blurred Camera").tag("Blurred Camera")
+                        Text("Frosted Glass").tag("Frosted Glass")
                     }
-                    .pickerStyle(SegmentedPickerStyle())
+                    .pickerStyle(MenuPickerStyle())
+
+                    if backgroundStyle == "Still Image" {
+                        TextField("Image URL", text: $ImageURL)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
                 }
                 Section ("More") {
                     Toggle("Enable Shake Menu", isOn: $shakeable)
@@ -86,17 +102,41 @@ struct SettingsView: View {
 
     private var toolbarSettings: some View {
         List {
-            Section("Toolbar Customization") {
+            Section {
+                Button(action: {
+                    toolbarManager.addDivider()
+                }) {
+                    Label("Add Divider", systemImage: "plus.circle")
+                }
+            } header: {
+                Text("Toolbar Customization")
+            } footer: {
+                Text("You can reorder tools and dividers by dragging them.")
+            }
+
+            Section {
                 ForEach(toolbarManager.availableTools) { tool in
                     HStack {
                         Image(systemName: tool.icon)
                             .frame(width: 30)
                         Text(tool.title)
                         Spacer()
-                        Toggle("", isOn: Binding(
-                            get: { tool.isEnabled },
-                            set: { _ in toolbarManager.toggleToolVisibility(id: tool.id) }
-                        ))
+                        if tool.actionType != .divider {
+                            Toggle("", isOn: Binding(
+                                get: { tool.isEnabled },
+                                set: { _ in toolbarManager.toggleToolVisibility(id: tool.id) }
+                            ))
+                        } else {
+                            Button(role: .destructive) {
+                                if let index = toolbarManager.availableTools.firstIndex(where: { $0.id == tool.id }) {
+                                    toolbarManager.availableTools.remove(at: index)
+                                    toolbarManager.saveTools()
+                                }
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
                 }
                 .onMove(perform: toolbarManager.reorderTools)
@@ -131,6 +171,31 @@ struct SettingsView: View {
             }
         }
         .tabItem { Label("Private", systemImage: "hand.raised") }
+    }
+
+    private var importSettings: some View {
+        List {
+            Section("Data Migration") {
+                Button(action: {
+                    showFilePicker = true
+                }) {
+                    Label("Import From Browsers", systemImage: "square.and.arrow.down")
+                }
+            } footer: {
+                Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
+            }
+        }
+        .tabItem { Label("Import", systemImage: "tray.and.arrow.down") }
+    }
+
+    private func importData(from url: URL) {
+        // Implementation of the import logic. For now, we simulate a successful import.
+        // In a real scenario, we would unzip and parse the content.
+        print("Importing from \(url.lastPathComponent)")
+
+        // Placeholder logic:
+        // favoritesManager.addFavorite(...)
+        // historyManager.addToHistory(...)
     }
 
     private var experimentalSettings: some View {

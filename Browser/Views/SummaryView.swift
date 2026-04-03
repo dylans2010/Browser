@@ -17,15 +17,34 @@ struct SummaryView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if isLoading {
-                        ProgressView("Analyzing page content...")
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            VStack(spacing: 20) {
+                                ProgressView()
+                                    .progressViewStyle(ModernLoadingStyle())
+                                Text("Analyzing page content...")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 100)
+                        } else if let error = errorMessage {
+                            GroupBox {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.red)
+                                    Text(error)
+                                        .foregroundColor(.red)
+                                }
+                                .padding()
+                            }
                             .padding()
-                    } else if let error = errorMessage {
-                        Text(error)
-                            .foregroundColor(.red)
-                    } else {
-                        Text(summary)
-                            .font(.body)
+                        } else {
+                            GroupBox {
+                                Text(LocalizedStringKey(summary))
+                                    .font(.body)
+                                    .padding(5)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .groupBoxStyle(ModernGroupBoxStyle())
                             .padding()
                         }
                     }
@@ -61,7 +80,7 @@ struct SummaryView: View {
                 let result = try await OpenRouterService.shared.fetchCompletion(
                     apiKey: aiConfig.apiKey,
                     model: aiConfig.currentModel,
-                    prompt: "Please provide a concise summary of this page content.",
+                    prompt: "Please provide a concise summary of this page content. Use markdown for better formatting, including bold text, bullet points, and headers where appropriate.",
                     context: content
                 )
                 summary = result
@@ -71,5 +90,45 @@ struct SummaryView: View {
                 isLoading = false
             }
         }
+    }
+}
+
+struct ModernLoadingStyle: ProgressViewStyle {
+    @State private var isAnimating = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        ZStack {
+            Circle()
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 4)
+                .frame(width: 50, height: 50)
+
+            Circle()
+                .trim(from: 0, to: 0.7)
+                .stroke(
+                    LinearGradient(gradient: Gradient(colors: [.blue, .purple, .pink]), startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .frame(width: 50, height: 50)
+                .rotationEffect(Angle(degrees: isAnimating ? 360 : 0))
+                .onAppear {
+                    withAnimation(Animation.linear(duration: 1).repeatForever(autoreverses: false)) {
+                        isAnimating = true
+                    }
+                }
+        }
+    }
+}
+
+struct ModernGroupBoxStyle: GroupBoxStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.content
+            .padding()
+            .background(.ultraThinMaterial)
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }

@@ -38,6 +38,8 @@ struct BrowserView: View {
     @State private var aiResultLoading = false
 
     @State private var showFindOnPage = false
+    @FocusState private var isAddressBarFocused: Bool
+    @State private var isEditingAddressBar = false
 
     var body: some View {
         ZStack {
@@ -59,7 +61,9 @@ struct BrowserView: View {
                 .environmentObject(browserViewModel)
         }
         .sheet(isPresented: $showAllTabs) { AllTabsView(viewModel: browserViewModel) }
-        .sheet(isPresented: $showPrivateTabs) { PrivateTabsView(viewModel: browserViewModel) }
+        .fullScreenCover(isPresented: $showPrivateTabs) {
+            PrivateTabsView(viewModel: browserViewModel)
+        }
         .sheet(isPresented: $showSummary) {
             SummaryView(viewModel: browserViewModel)
                 .environmentObject(aiConfig)
@@ -126,11 +130,18 @@ struct BrowserView: View {
                         .lineLimit(1)
                 }
 
+                #if os(iOS)
+                AddressBarTextField(text: $browserViewModel.urlString, isFocused: $isAddressBarFocused, onCommit: loadURL)
+                    .frame(height: 20)
+                #else
                 TextField("Search or enter URL", text: $browserViewModel.urlString, onCommit: {
                     loadURL()
                 })
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.center)
+                .focused($isAddressBarFocused)
+                .submitLabel(.go)
+                #endif
             }
             .padding(10)
             .background(addressBarBackground)
@@ -207,10 +218,14 @@ struct BrowserView: View {
             }
             Divider()
             ForEach(toolbarManager.availableTools.filter { $0.isEnabled }) { tool in
-                Button {
-                    executeTool(tool)
-                } label: {
-                    Label(tool.title, systemImage: tool.icon)
+                if tool.actionType == .divider {
+                    Divider()
+                } else {
+                    Button {
+                        executeTool(tool)
+                    } label: {
+                        Label(tool.title, systemImage: tool.icon)
+                    }
                 }
             }
             Divider()
@@ -219,6 +234,79 @@ struct BrowserView: View {
     }
 
 
+}
+
+#if os(iOS)
+struct AddressBarTextField: UIViewRepresentable {
+    @Binding var text: String
+    @FocusState.Binding var isFocused: Bool
+    var onCommit: () -> Void
+
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField()
+        textField.delegate = context.coordinator
+        textField.placeholder = "Search or enter URL"
+        textField.textAlignment = .center
+        textField.returnKeyType = .go
+        textField.autocapitalizationType = .none
+        textField.autocorrectionType = .no
+        textField.spellCheckingType = .no
+        textField.keyboardType = .webSearch
+        return textField
+    }
+
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        uiView.text = text
+        if isFocused {
+            uiView.becomeFirstResponder()
+        } else {
+            uiView.resignFirstResponder()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: AddressBarTextField
+
+        init(_ parent: AddressBarTextField) {
+            self.parent = parent
+        }
+
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            DispatchQueue.main.async {
+                self.parent.isFocused = true
+                textField.selectAll(nil)
+            }
+        }
+
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            DispatchQueue.main.async {
+                self.parent.isFocused = false
+            }
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            parent.text = textField.text ?? ""
+            parent.onCommit()
+            textField.resignFirstResponder()
+            return true
+        }
+
+        func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            if let text = textField.text, let textRange = Range(range, in: text) {
+                let updatedText = text.replacingCharacters(in: textRange, with: string)
+                parent.text = updatedText
+            }
+            return true
+        }
+    }
+}
+#endif
+
+extension BrowserView {
     private func loadURL() {
         var input = browserViewModel.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         if input.contains(".") && !input.contains(" ") {
@@ -298,6 +386,7 @@ struct BrowserView: View {
                     aiResultLoading = false
                 }
             }
+        case .divider: break
         case .toneAnalysis:
             aiResultTitle = "Tone Analysis"
             aiResultLoading = true
