@@ -73,6 +73,11 @@ enum ToolActionType: String, Codable, CaseIterable {
     case viewHistory
     // Collections
     case addToCollection
+    // New Tools
+    case addNote
+    case hideElements
+    case revertToOriginal
+    case websiteStyling
     // UI
     case divider
 }

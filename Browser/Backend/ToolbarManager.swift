@@ -59,7 +59,12 @@ class ToolbarManager: ObservableObject {
         // History
         ToolItem(title: "View History", icon: "clock", actionType: .viewHistory, category: .history),
         // Collections
-        ToolItem(title: "Add to Collection", icon: "folder.badge.plus", actionType: .addToCollection, category: .collections)
+        ToolItem(title: "Add to Collection", icon: "folder.badge.plus", actionType: .addToCollection, category: .collections),
+        // New Tools
+        ToolItem(title: "Add Note", icon: "note.text.badge.plus", actionType: .addNote, category: .page, requiresWebView: true),
+        ToolItem(title: "Hide Elements", icon: "eye.slash", actionType: .hideElements, category: .advanced, requiresWebView: true),
+        ToolItem(title: "Revert To Original", icon: "arrow.counterclockwise.circle", actionType: .revertToOriginal, category: .advanced, requiresWebView: true),
+        ToolItem(title: "Website Styling", icon: "paintpalette", actionType: .websiteStyling, category: .advanced, requiresWebView: true)
     ]
 
     @Published var visibleToolIDs: [UUID] = []

@@ -5,6 +5,9 @@ struct Note: Identifiable, Codable {
     let text: String
     let date: Date
     let sourceURL: String
+    var title: String = ""
+    var content: String = "" // Markdown content
+    var dateCreated: Date = Date()
 }
 
 class NotesManager: ObservableObject {
@@ -21,7 +24,12 @@ class NotesManager: ObservableObject {
     }
 
     func addNote(text: String, sourceURL: String) {
-        let newNote = Note(text: text, date: Date(), sourceURL: sourceURL)
+        let newNote = Note(text: text, date: Date(), sourceURL: sourceURL, title: "Quick Note", content: text)
+        notes.append(newNote)
+    }
+
+    func addNote(title: String, content: String, sourceURL: String) {
+        let newNote = Note(text: content, date: Date(), sourceURL: sourceURL, title: title, content: content)
         notes.append(newNote)
     }
 
