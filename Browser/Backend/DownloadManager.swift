@@ -16,6 +16,7 @@ struct DownloadItem: Identifiable, Codable {
     var progress: Double
     var status: DownloadStatus
     var localURL: URL?
+    var downloadURL: URL?
 }
 
 class DownloadManager: ObservableObject {
@@ -26,7 +27,7 @@ class DownloadManager: ObservableObject {
 
     func startDownload(url: URL) {
         let fileName = url.lastPathComponent.isEmpty ? "download" : url.lastPathComponent
-        let item = DownloadItem(fileName: fileName, progress: 0.0, status: .downloading)
+        let item = DownloadItem(fileName: fileName, progress: 0.0, status: .downloading, downloadURL: url)
         downloads.append(item)
         showDownloadsUI = true
 
@@ -74,7 +75,7 @@ class DownloadManager: ObservableObject {
     fileprivate func completeDownload(id: UUID, localURL: URL) {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             let fileName = downloads[index].fileName
-            let downloadsFolder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+            let downloadsFolder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
             let destinationURL = downloadsFolder.appendingPathComponent(fileName)
             try? FileManager.default.removeItem(at: destinationURL)
             try? FileManager.default.moveItem(at: localURL, to: destinationURL)
@@ -106,7 +107,7 @@ class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0
         manager.updateProgress(id: itemId, progress: progress)
     }
 

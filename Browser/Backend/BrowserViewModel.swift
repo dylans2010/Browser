@@ -1,5 +1,6 @@
 import Foundation
 import WebKit
+import Combine
 
 @available(iOS 16.0, *)
 class BrowserViewModel: NSObject, ObservableObject {
@@ -10,8 +11,12 @@ class BrowserViewModel: NSObject, ObservableObject {
     @Published var canGoForward = false
     @Published var isLoading = false
     @Published var loadError: String? = nil
+
     var historyManager: HistoryManager?
     var downloadManager: DownloadManager?
+    var adBlocker = AdBlocker.shared
+    var elementHiderManager: ElementHiderManager?
+    var websiteStyleManager: WebsiteStyleManager?
 
     var activeTab: TabItem? {
         tabs.first(where: { $0.id == activeTabId })
@@ -42,14 +47,19 @@ class BrowserViewModel: NSObject, ObservableObject {
             }
         } else {
             let defaultURL = UserDefaults.standard.string(forKey: "Default-URL") ?? ""
-            addTab(url: URL(string: defaultURL))
+            if !defaultURL.isEmpty {
+                addTab(url: URL(string: defaultURL))
+            }
         }
     }
 
     func addTab(url: URL? = nil, isEphemeral: Bool = false) {
         let newTab = TabItem(url: url, isEphemeral: isEphemeral)
         newTab.webView.navigationDelegate = self
-        ScriptManager.shared.injectScripts(into: newTab.webView, for: url)
+        newTab.webView.configuration.userContentController.add(self, name: "elementHider")
+
+        injectScripts(into: newTab.webView, for: url)
+
         tabs.append(newTab)
         activeTabId = newTab.id
         if let url = url {
@@ -60,13 +70,11 @@ class BrowserViewModel: NSObject, ObservableObject {
     func removeTab(id: UUID) {
         if let tab = tabs.first(where: { $0.id == id }) {
             tab.webView.navigationDelegate = nil
+            tab.webView.configuration.userContentController.removeScriptMessageHandler(forName: "elementHider")
             tab.webView.stopLoading()
 
             if tab.isEphemeral {
-                let saveDataWhilePrivate = UserDefaults.standard.bool(forKey: "saveDataWhilePrivate")
-                if saveDataWhilePrivate {
-                    tab.webView.configuration.websiteDataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {}
-                }
+                tab.webView.configuration.websiteDataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {}
             }
         }
 
@@ -75,7 +83,6 @@ class BrowserViewModel: NSObject, ObservableObject {
             activeTabId = tabs.last?.id
         }
 
-        // Ensure we always have a base state
         if tabs.isEmpty {
             activeTabId = nil
             urlString = ""
@@ -113,20 +120,37 @@ class BrowserViewModel: NSObject, ObservableObject {
         isLoading = false
     }
 
-    func duplicateTab() {
-        guard let current = activeTab else { return }
-        addTab(url: current.url)
-    }
+    func injectScripts(into webView: WKWebView, for url: URL?) {
+        let contentController = webView.configuration.userContentController
+        // Clear previous scripts if necessary, but careful not to remove others
+        // For simplicity in this upgrade, we'll just add
 
-    func closeOtherTabs() {
-        guard let activeId = activeTabId else { return }
-        let toRemove = tabs.filter { $0.id != activeId }
-        for tab in toRemove {
-            tab.webView.navigationDelegate = nil
-            tab.webView.stopLoading()
+        // Ad Blocker
+        let adScript = WKUserScript(source: adBlocker.getBlockingScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        contentController.addUserScript(adScript)
+
+        if let domain = url?.host {
+            // Element Hider
+            if let hiderManager = elementHiderManager {
+                let hiderScript = hiderManager.getInjectionScript(for: domain)
+                if !hiderScript.isEmpty {
+                    let script = WKUserScript(source: hiderScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+                    contentController.addUserScript(script)
+                }
+            }
+
+            // Website Style
+            if let styleManager = websiteStyleManager {
+                let styleScript = styleManager.getInjectionScript(for: domain)
+                if !styleScript.isEmpty {
+                    let script = WKUserScript(source: styleScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+                    contentController.addUserScript(script)
+                }
+            }
         }
-        tabs.removeAll { $0.id != activeId }
-        saveTabs()
+
+        // Also inject existing scripts
+        ScriptManager.shared.injectScripts(into: webView, for: url)
     }
 
     func extractPageContent() async -> String {
@@ -157,44 +181,38 @@ extension BrowserViewModel: WKNavigationDelegate {
         }
     }
 
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        if activeTab?.webView == webView {
-            isLoading = false
-            let nsError = error as NSError
-            // NSURLErrorCancelled (-999) is triggered by normal navigations; ignore it
-            if nsError.code != NSURLErrorCancelled {
-                loadError = error.localizedDescription
-            }
-        }
-    }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if let index = tabs.firstIndex(where: { $0.webView == webView }) {
+            let tabId = tabs[index].id
+            tabs[index].url = webView.url
+            tabs[index].title = webView.title ?? "Untitled"
 
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        if activeTab?.webView == webView {
-            isLoading = false
-            let nsError = error as NSError
-            if nsError.code != NSURLErrorCancelled {
-                loadError = error.localizedDescription
+            // Re-inject scripts on navigation
+            injectScripts(into: webView, for: webView.url)
+
+            if activeTabId == tabs[index].id {
+                urlString = webView.url?.absoluteString ?? ""
+                canGoBack = webView.canGoBack
+                canGoForward = webView.canGoForward
+                isLoading = false
+                loadError = nil
             }
+
+            if let url = webView.url?.absoluteString {
+                historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
+            }
+
+            saveTabs()
         }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if TrackerBlocker.shared.shouldBlock(request: navigationAction.request) {
-            decisionHandler(.cancel)
-            return
-        }
-
         if let url = navigationAction.request.url {
-            if AdBlocker.shared.shouldBlock(url: url) {
+            if adBlocker.shouldBlock(url: url) {
                 decisionHandler(.cancel)
                 return
             }
-        }
 
-        if let url = navigationAction.request.url {
-            NetworkInspector.shared.logRequest(url: url.absoluteString, method: navigationAction.request.httpMethod ?? "GET", status: 0)
-
-            // Check for potential downloads (file extensions or specific headers)
             let pathExtension = url.pathExtension.lowercased()
             let downloadExtensions = ["zip", "pdf", "dmg", "pkg", "exe", "ipa", "apk", "mp3", "mp4", "mov", "wav"]
             if downloadExtensions.contains(pathExtension) {
@@ -206,62 +224,16 @@ extension BrowserViewModel: WKNavigationDelegate {
 
         decisionHandler(.allow)
     }
+}
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        if let response = navigationResponse.response as? HTTPURLResponse {
-            let contentType = response.allHeaderFields["Content-Type"] as? String ?? ""
-            let contentDisposition = response.allHeaderFields["Content-Disposition"] as? String ?? ""
-
-            if contentDisposition.contains("attachment") || contentType.contains("application/octet-stream") {
-                if let url = response.url {
-                    downloadManager?.startDownload(url: url)
-                    decisionHandler(.cancel)
-                    return
-                }
+@available(iOS 16.0, *)
+extension BrowserViewModel: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "elementHider", let selector = message.body as? String {
+            if let domain = activeTab?.url?.host {
+                elementHiderManager?.hideElement(selector: selector, for: domain)
+                reload() // Reload to apply
             }
-        }
-        decisionHandler(.allow)
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        if let index = tabs.firstIndex(where: { $0.webView == webView }) {
-            let tabId = tabs[index].id
-            tabs[index].url = webView.url
-            tabs[index].title = webView.title ?? "Untitled"
-
-            // Capture Snapshot
-            let config = WKSnapshotConfiguration()
-            config.rect = webView.bounds
-            webView.takeSnapshot(with: config) { image, error in
-                if let image = image {
-                    DispatchQueue.main.async {
-                        if let updatedIndex = self.tabs.firstIndex(where: { $0.id == tabId }) {
-                            self.tabs[updatedIndex].snapshot = image
-                        }
-                    }
-                }
-            }
-
-            if activeTabId == tabs[index].id {
-                urlString = webView.url?.absoluteString ?? ""
-                canGoBack = webView.canGoBack
-                canGoForward = webView.canGoForward
-                isLoading = false
-                loadError = nil
-            }
-
-            if let url = webView.url?.absoluteString {
-                if tabs[index].isEphemeral {
-                    let saveDataWhilePrivate = UserDefaults.standard.bool(forKey: "saveDataWhilePrivate")
-                    if !saveDataWhilePrivate {
-                        historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
-                    }
-                } else {
-                    historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
-                }
-            }
-
-            saveTabs()
         }
     }
 }

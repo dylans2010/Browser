@@ -32,4 +32,30 @@ class AdBlocker {
 
         return false
     }
+
+    func getBlockingScript() -> String {
+        return """
+        (function() {
+            const selectors = [
+                '.ad', '.ads', '.adsbygoogle', '[id^="ad-"]', '[class^="ad-"]',
+                '.banner-ad', '.sidebar-ad', '.popup-ad', '.overlay-ad'
+            ];
+
+            const hideAds = () => {
+                selectors.forEach(selector => {
+                    document.querySelectorAll(selector).forEach(el => {
+                        el.style.display = 'none';
+                    });
+                });
+            };
+
+            // Run immediately
+            hideAds();
+
+            // Run on changes
+            const observer = new MutationObserver(hideAds);
+            observer.observe(document.body, { childList: true, subtree: true });
+        })();
+        """
+    }
 }
