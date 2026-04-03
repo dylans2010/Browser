@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CollectionsView: View {
     @EnvironmentObject var collectionsManager: CollectionsManager
+    @EnvironmentObject var browserViewModel: BrowserViewModel
     @Environment(\.dismiss) var dismiss
     @State private var showCreate = false
 
