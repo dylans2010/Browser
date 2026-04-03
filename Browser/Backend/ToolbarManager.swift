@@ -62,4 +62,11 @@ class ToolbarManager: ObservableObject {
         saveTools()
         visibleToolIDs = availableTools.filter { $0.isEnabled }.map { $0.id }
     }
+
+    func addDivider() {
+        let divider = ToolItem(title: "Divider", icon: "minus", actionType: .divider)
+        availableTools.append(divider)
+        saveTools()
+        visibleToolIDs = availableTools.filter { $0.isEnabled }.map { $0.id }
+    }
 }

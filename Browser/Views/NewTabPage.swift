@@ -6,8 +6,8 @@ import AVFoundation
 
 struct NewTabPage: View {
     @State private var image: Image? = nil
-    @AppStorage("Use-Image") var useImage = false
-    @AppStorage("Selected NewTab Config") var selectedNewTabConfig = 1
+    @AppStorage("homePageBackgroundStyle") var backgroundStyle: String = "Blurred Camera"
+    @AppStorage("new-tab-bg") var ImageURL = ""
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var browserViewModel: BrowserViewModel
 
@@ -50,9 +50,26 @@ struct NewTabPage: View {
 
     private var backgroundView: some View {
         Group {
-            if useImage {
-                DefaultImageView()
-            } else {
+            switch backgroundStyle {
+            case "Still Image":
+                if !ImageURL.isEmpty {
+                    AsyncImage(url: URL(string: ImageURL)) { image in
+                        image.resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        DefaultImageView()
+                    }
+                    .edgesIgnoringSafeArea(.all)
+                } else {
+                    DefaultImageView()
+                }
+            case "Frosted Glass":
+                ZStack {
+                    LinearGradient(gradient: Gradient(colors: [.blue.opacity(0.3), .purple.opacity(0.3)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Color.clear.background(.ultraThinMaterial)
+                }
+                .edgesIgnoringSafeArea(.all)
+            default: // Blurred Camera
                 CameraView()
                     .overlay(.ultraThinMaterial)
             }
