@@ -2,9 +2,17 @@ import Foundation
 import WebKit
 import Combine
 
+struct TabGroup: Identifiable, Codable {
+    var id = UUID()
+    var name: String
+    var color: String = "#007AFF"
+}
+
 @available(iOS 16.0, *)
 class BrowserViewModel: NSObject, ObservableObject {
     @Published var tabs: [TabItem] = []
+    @Published var tabGroups: [TabGroup] = []
+    @Published var activeGroupId: UUID?
     @Published var activeTabId: UUID?
     @Published var urlString: String = ""
     @Published var canGoBack = false
@@ -13,6 +21,7 @@ class BrowserViewModel: NSObject, ObservableObject {
     @Published var loadError: String? = nil
     @Published var isHideElementsModeEnabled = false
     @Published var consoleLogs: [String] = []
+    @Published var estimatedReadTime: Int? = nil
 
     var historyManager: HistoryManager?
     var downloadManager: DownloadManager?
@@ -27,12 +36,20 @@ class BrowserViewModel: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        loadPersistedTabGroups()
         loadPersistedTabs()
     }
 
-    private func saveTabs() {
-        let urls = tabs.compactMap { $0.url?.absoluteString }
-        UserDefaults.standard.set(urls, forKey: "persisted_tab_urls")
+    func saveTabs() {
+        if let encoded = try? JSONEncoder().encode(tabs) {
+            UserDefaults.standard.set(encoded, forKey: "persisted_tabs_json")
+        }
+    }
+
+    func saveTabGroups() {
+        if let encoded = try? JSONEncoder().encode(tabGroups) {
+            UserDefaults.standard.set(encoded, forKey: "persisted_tab_groups_json")
+        }
     }
 
     func suspendInactiveTabs() {
@@ -43,21 +60,38 @@ class BrowserViewModel: NSObject, ObservableObject {
         }
     }
 
+    private func loadPersistedTabGroups() {
+        if let data = UserDefaults.standard.data(forKey: "persisted_tab_groups_json"),
+           let decoded = try? JSONDecoder().decode([TabGroup].self, from: data) {
+            tabGroups = decoded
+        }
+    }
+
     private func loadPersistedTabs() {
-        if let urls = UserDefaults.standard.stringArray(forKey: "persisted_tab_urls"), !urls.isEmpty {
-            for urlString in urls {
-                addTab(url: URL(string: urlString))
+        if let data = UserDefaults.standard.data(forKey: "persisted_tabs_json"),
+           let decoded = try? JSONDecoder().decode([TabItem].self, from: data) {
+            tabs = decoded
+            for index in tabs.indices {
+                tabs[index].webView.navigationDelegate = self
+                tabs[index].webView.configuration.userContentController.add(self, name: "elementHider")
+                tabs[index].webView.configuration.userContentController.add(self, name: "devConsole")
+                if let url = tabs[index].url {
+                    tabs[index].webView.load(URLRequest(url: url))
+                }
             }
+            activeTabId = tabs.last?.id
         } else {
             let defaultURL = UserDefaults.standard.string(forKey: "Default-URL") ?? ""
             if !defaultURL.isEmpty {
                 addTab(url: URL(string: defaultURL))
+            } else {
+                activeTabId = nil
             }
         }
     }
 
-    func addTab(url: URL? = nil, isEphemeral: Bool = false) {
-        let newTab = TabItem(url: url, isEphemeral: isEphemeral)
+    func addTab(url: URL? = nil, isEphemeral: Bool = false, groupId: UUID? = nil) {
+        let newTab = TabItem(url: url, isEphemeral: isEphemeral, groupId: groupId ?? activeGroupId)
         newTab.webView.navigationDelegate = self
         newTab.webView.configuration.userContentController.add(self, name: "elementHider")
         newTab.webView.configuration.userContentController.add(self, name: "devConsole")
@@ -232,6 +266,39 @@ class BrowserViewModel: NSObject, ObservableObject {
             }
         }
     }
+
+    func updateReadTime() {
+        Task {
+            let content = await extractPageContent()
+            let words = content.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            let count = words.count
+            // Average reading speed is 200-250 words per minute
+            let minutes = Int(ceil(Double(count) / 225.0))
+            DispatchQueue.main.async {
+                self.estimatedReadTime = (minutes > 0) ? minutes : nil
+            }
+        }
+    }
+
+    func createTabGroup(name: String, color: String = "#007AFF") {
+        let group = TabGroup(name: name, color: color)
+        tabGroups.append(group)
+        saveTabGroups()
+    }
+
+    func deleteTabGroup(id: UUID) {
+        tabGroups.removeAll { $0.id == id }
+        for index in tabs.indices {
+            if tabs[index].groupId == id {
+                tabs[index].groupId = nil
+            }
+        }
+        if activeGroupId == id {
+            activeGroupId = nil
+        }
+        saveTabGroups()
+        saveTabs()
+    }
 }
 
 @available(iOS 16.0, *)
@@ -259,6 +326,7 @@ extension BrowserViewModel: WKNavigationDelegate {
                 canGoForward = webView.canGoForward
                 isLoading = false
                 loadError = nil
+                updateReadTime()
             }
 
             if let url = webView.url?.absoluteString {

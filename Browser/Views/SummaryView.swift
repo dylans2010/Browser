@@ -8,6 +8,7 @@ struct SummaryView: View {
     @State private var summary: String = "Summarizing..."
     @State private var isLoading: Bool = true
     @State private var errorMessage: String?
+    @State private var isCopied: Bool = false
 
     var body: some View {
         NavigationView {
@@ -59,8 +60,13 @@ struct SummaryView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
                         UIPasteboard.general.string = cleanSummary
+                        isCopied = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            isCopied = false
+                        }
                     }) {
-                        Image(systemName: "doc.on.doc")
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                            .foregroundColor(isCopied ? .green : .blue)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {

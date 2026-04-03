@@ -90,48 +90,103 @@ struct BrowserView: View {
                         onCommit: { loadURL() },
                         menuItems: AnyView(toolbarMenuItems)
                     )
-                    .padding(.bottom, 40)
+                    .padding(.bottom, isAddressBarFocused ? 10 : 40)
                 }
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .animation(.easeOut(duration: 0.25), value: isAddressBarFocused)
             }
         }
         .findNavigator(isPresented: $showFindOnPage)
         .environmentObject(browserViewModel)
         .environmentObject(elementHiderManager)
         .environmentObject(websiteStyleManager)
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
         .sheet(isPresented: $showDownloads) {
             DownloadsView()
                 .presentationDetents([.fraction(0.3), .medium])
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
         }
-        .sheet(isPresented: $showHistory) { HistoryView(historyManager: historyManager) }
-        .sheet(isPresented: $showAllTabs) { AllTabsView(viewModel: browserViewModel) }
-        .fullScreenCover(isPresented: $showPrivateTabs) { PrivateTabsView(viewModel: browserViewModel) }
-        .sheet(isPresented: $showSummary) { SummaryView(viewModel: browserViewModel).environmentObject(aiConfig) }
-        .sheet(isPresented: $showAIChat) { AIChatView(viewModel: browserViewModel).environmentObject(aiConfig) }
-        .sheet(isPresented: $showReaderMode) { ReaderModeView(viewModel: browserViewModel) }
-        .sheet(isPresented: $showNotes) { NotesAllView() }
-        .sheet(isPresented: $showAddNote) { NoteAddView(sourceURL: browserViewModel.urlString) }
-        .sheet(isPresented: $showAIResult) { AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading) }
-        .sheet(isPresented: $showNetworkLogs) { NetworkLogsView() }
+        .sheet(isPresented: $showHistory) {
+            HistoryView(historyManager: historyManager)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showAllTabs) {
+            AllTabsView(viewModel: browserViewModel)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .fullScreenCover(isPresented: $showPrivateTabs) {
+            PrivateTabsView(viewModel: browserViewModel)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showSummary) {
+            SummaryView(viewModel: browserViewModel)
+                .presentationDetents([.medium, .large])
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showAIChat) {
+            AIChatView(viewModel: browserViewModel)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showReaderMode) {
+            ReaderModeView(viewModel: browserViewModel)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showNotes) {
+            NotesAllView()
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showAddNote) {
+            NoteAddView(sourceURL: browserViewModel.urlString)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showAIResult) {
+            AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showNetworkLogs) {
+            NetworkLogsView()
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
         .sheet(isPresented: $showDeveloperTools) {
-            if let webView = browserViewModel.activeTab?.webView {
-                DeveloperToolsView(webView: webView)
-            } else {
-                Text("Open a website first.")
-                    .padding()
+            Group {
+                if let webView = browserViewModel.activeTab?.webView {
+                    DeveloperToolsView(webView: webView)
+                } else {
+                    Text("Open a website first.")
+                        .padding()
+                }
             }
+            .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
         }
-        .sheet(isPresented: $showPageSource) { ViewPageSourceView(source: pageSourceContent) }
-        .sheet(isPresented: $showAddToCollection) { addToCollectionSheet }
-        .sheet(isPresented: $showBookmarks) { BookmarksView() }
-        .sheet(isPresented: $showSaveForLater) { SaveForLaterView() }
+        .sheet(isPresented: $showPageSource) {
+            ViewPageSourceView(source: pageSourceContent)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showAddToCollection) {
+            addToCollectionSheet
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showBookmarks) {
+            BookmarksView()
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
+        .sheet(isPresented: $showSaveForLater) {
+            SaveForLaterView()
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+        }
         .sheet(isPresented: $showWebsiteStyle) {
-            if let domain = websiteStyleManager.normalizedDomain(from: browserViewModel.activeTab?.url?.host) {
-                WebsiteStyleView(domain: domain)
-            } else {
-                Text("Open a website first.")
-                    .padding()
+            Group {
+                if let domain = websiteStyleManager.normalizedDomain(from: browserViewModel.activeTab?.url?.host) {
+                    WebsiteStyleView(domain: domain)
+                } else {
+                    Text("Open a website first.")
+                        .padding()
+                }
             }
+            .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
         }
         .onAppear {
             browserViewModel.historyManager = historyManager
@@ -195,8 +250,18 @@ struct BrowserView: View {
         if input.contains(".") && !input.contains(" ") {
             if !input.contains("://") { input = "https://\(input)" }
         } else {
+            let engine = UserDefaults.standard.string(forKey: "searchEngine") ?? "Google"
+            let baseURL: String
+            switch engine {
+            case "Bing": baseURL = "https://www.bing.com/search?q="
+            case "DuckDuckGo": baseURL = "https://duckduckgo.com/?q="
+            case "Ecosia": baseURL = "https://www.ecosia.org/search?q="
+            case "Yahoo": baseURL = "https://search.yahoo.com/search?p="
+            default: baseURL = "https://www.google.com/search?q="
+            }
+
             let query = input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input
-            input = "https://www.google.com/search?q=\(query)"
+            input = baseURL + query
             SearchLearningModel.shared.trackSearch(query: input)
         }
         browserViewModel.urlString = input
@@ -231,6 +296,13 @@ struct BrowserView: View {
                 }
                 Button(action: { showWebsiteStyle = true }) {
                     Label("Website Styling", systemImage: "paintpalette")
+                }
+                Button(action: {
+                    if let webView = browserViewModel.activeTab?.webView {
+                        TranslateSiteTool.execute(in: webView)
+                    }
+                }) {
+                    Label("Translate Site", systemImage: "translate")
                 }
             }
 
@@ -289,6 +361,41 @@ struct BrowserView: View {
         }
     }
 
+}
+
+@available(iOS 16.0, *)
+extension View {
+    func injectEnvironment(
+        viewModel: BrowserViewModel,
+        hider: ElementHiderManager,
+        style: WebsiteStyleManager,
+        ai: AIConfiguration,
+        notes: NotesManager,
+        tts: TTSManager,
+        history: HistoryManager,
+        downloads: DownloadManager,
+        toolbar: ToolbarManager,
+        favorites: FavoritesManager,
+        collections: CollectionsManager,
+        saveLater: SaveForLaterManager
+    ) -> some View {
+        self.environmentObject(viewModel)
+            .environmentObject(hider)
+            .environmentObject(style)
+            .environmentObject(ai)
+            .environmentObject(notes)
+            .environmentObject(tts)
+            .environmentObject(history)
+            .environmentObject(downloads)
+            .environmentObject(toolbar)
+            .environmentObject(favorites)
+            .environmentObject(collections)
+            .environmentObject(saveLater)
+    }
+}
+
+@available(iOS 16.0, *)
+extension BrowserView {
     private var addToCollectionSheet: some View {
         NavigationView {
             List(collectionsManager.collections) { collection in

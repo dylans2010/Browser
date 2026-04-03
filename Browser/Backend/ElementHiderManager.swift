@@ -45,9 +45,19 @@ class ElementHiderManager: ObservableObject {
             window.__elementHiderActive = true;
 
             const style = document.createElement('style');
-            style.id = 'element-hider-overlay';
+            style.id = 'element-hider-overlay-style';
             style.innerHTML = `
-                *:hover { outline: 2px solid #ff3b30 !important; cursor: crosshair !important; }
+                *:hover {
+                    outline: 2px solid #007aff !important;
+                    background-color: rgba(0, 122, 255, 0.1) !important;
+                    transition: outline 0.2s ease, background-color 0.2s ease;
+                    cursor: crosshair !important;
+                }
+                .hider-animating-out {
+                    opacity: 0 !important;
+                    transform: scale(0.9) !important;
+                    transition: opacity 0.4s ease, transform 0.4s ease !important;
+                }
                 html, body { cursor: crosshair !important; }
             `;
             document.head.appendChild(style);
@@ -56,14 +66,21 @@ class ElementHiderManager: ObservableObject {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
-                const selector = getUniqueSelector(e.target);
-                e.target.style.display = 'none';
-                window.webkit.messageHandlers.elementHider.postMessage(selector);
+                const target = e.target;
+                const selector = getUniqueSelector(target);
+
+                // Add modern animation
+                target.classList.add('hider-animating-out');
+
+                setTimeout(() => {
+                    target.style.display = 'none';
+                    window.webkit.messageHandlers.elementHider.postMessage(selector);
+                }, 400);
             };
 
             const getUniqueSelector = function(el) {
                 if (el.id) return '#' + el.id;
-                if (el.className) {
+                if (el.className && typeof el.className === 'string') {
                     const classes = Array.from(el.classList).join('.');
                     if (classes) return el.tagName.toLowerCase() + '.' + classes;
                 }
@@ -84,7 +101,7 @@ class ElementHiderManager: ObservableObject {
 
             const cleanup = function() {
                 window.__elementHiderActive = false;
-                const existingStyle = document.getElementById('element-hider-overlay');
+                const existingStyle = document.getElementById('element-hider-overlay-style');
                 if (existingStyle) {
                     existingStyle.remove();
                 }
