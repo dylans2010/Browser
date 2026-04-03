@@ -41,6 +41,8 @@ struct BrowserView: View {
     @State private var showWebsiteStyle = false
     @State private var showBookmarks = false
     @State private var showSaveForLater = false
+    @State private var showToolsMenu = false
+    @State private var showSecurityDetails = false
 
     // Data for sheets
     @State private var aiResultTitle = ""
@@ -49,6 +51,8 @@ struct BrowserView: View {
     @State private var developerDOMInfo: InspectElementTool.DOMInfo? = nil
     @State private var pageSourceContent = ""
     @State private var pdfURL: URL? = nil
+    @State private var securityDetails: SecurityDetails? = nil
+    @State private var securityFetcher = SecurityDetailsFetcher()
 
     var body: some View {
         ZStack {
@@ -73,14 +77,10 @@ struct BrowserView: View {
 
             // Suggestions overlay
             if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
-                VStack {
-                    Spacer().frame(height: 100)
-                    SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
-                        browserViewModel.urlString = selected
-                        loadURL()
-                        isAddressBarFocused = false
-                    }
-                    Spacer()
+                SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
+                    browserViewModel.urlString = selected
+                    loadURL()
+                    isAddressBarFocused = false
                 }
                 .zIndex(10)
             }
@@ -93,7 +93,11 @@ struct BrowserView: View {
                         viewModel: browserViewModel,
                         isFocused: $isAddressBarFocused,
                         onCommit: { loadURL() },
-                        menuItems: AnyView(toolbarMenuItems)
+                        onSecurityTap: { openSecurityDetails() },
+                        onShowToolsMenu: { showToolsMenu = true },
+                        onShowShare: { ShareTool.execute(url: browserViewModel.urlString) },
+                        onShowBookmarks: { showBookmarks = true },
+                        onShowTabs: { showAllTabs = true }
                     )
                     .padding(.bottom, 40)
                 }
@@ -119,12 +123,21 @@ struct BrowserView: View {
         .sheet(isPresented: $showAIResult) { AIResultView(title: aiResultTitle, content: aiResultContent, isLoading: aiResultLoading) }
         .sheet(isPresented: $showNetworkLogs) { NetworkLogsView() }
         .sheet(isPresented: $showDeveloperTools) {
-            if let info = developerDOMInfo { DeveloperToolsView(domInfo: info) }
+            DeveloperToolsView(domInfo: developerDOMInfo, pageURL: browserViewModel.activeTab?.url?.absoluteString)
         }
         .sheet(isPresented: $showPageSource) { ViewPageSourceView(source: pageSourceContent) }
         .sheet(isPresented: $showAddToCollection) { addToCollectionSheet }
         .sheet(isPresented: $showBookmarks) { BookmarksView() }
         .sheet(isPresented: $showSaveForLater) { SaveForLaterView() }
+        .sheet(isPresented: $showToolsMenu) {
+            ToolsMenuView(tools: enabledToolbarTools) { tool in
+                showToolsMenu = false
+                executeTool(tool)
+            }
+        }
+        .sheet(isPresented: $showSecurityDetails) {
+            SecurityDetailsView(details: securityDetails)
+        }
         .sheet(isPresented: $showWebsiteStyle) {
             if let domain = browserViewModel.activeTab?.url?.host {
                 WebsiteStyleView(domain: domain)
@@ -204,92 +217,156 @@ struct BrowserView: View {
         browserViewModel.loadURLString()
     }
 
-    private var toolbarMenuItems: some View {
-        Group {
-            // New Tools
-            Group {
-                Button(action: { showAddNote = true }) {
-                    Label("Add Note", systemImage: "note.text.badge.plus")
-                }
-                Button(action: {
-                    browserViewModel.enableHideElementsMode(using: elementHiderManager)
-                }) {
-                    Label("Hide Elements", systemImage: "eye.slash")
-                }
-                Button(action: {
-                    browserViewModel.disableHideElementsMode()
-                }) {
-                    Label("Stop Hiding Elements", systemImage: "escape")
-                }
-                .disabled(!browserViewModel.isHideElementsModeEnabled)
-                Button(action: {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        RevertToOriginalTool.execute(url: browserViewModel.activeTab?.url, elementHiderManager: elementHiderManager, webView: webView)
-                    }
-                }) {
-                    Label("Revert To Original", systemImage: "arrow.counterclockwise.circle")
-                }
-                Button(action: { showWebsiteStyle = true }) {
-                    Label("Website Styling", systemImage: "paintpalette")
+    private var enabledToolbarTools: [ToolItem] {
+        toolbarManager.availableTools.filter { $0.isEnabled && $0.actionType != .divider }
+    }
+
+    private func openSecurityDetails() {
+        showSecurityDetails = true
+        guard let url = browserViewModel.activeTab?.url else {
+            securityDetails = nil
+            return
+        }
+        securityDetails = SecurityDetails(
+            host: url.host ?? "—",
+            isSecureConnection: (url.scheme?.lowercased() == "https"),
+            transport: url.scheme?.uppercased() ?? "Unknown",
+            certificateCommonName: "Loading…",
+            issuerSummary: "Loading…",
+            validFrom: nil,
+            validTo: nil
+        )
+        securityFetcher.fetch(for: url) { details in
+            if let details {
+                securityDetails = details
+            }
+        }
+    }
+
+    private func executeTool(_ tool: ToolItem) {
+        let webView = browserViewModel.activeTab?.webView
+        switch tool.actionType {
+        case .back:
+            BackTool.execute(viewModel: browserViewModel)
+        case .forward:
+            if let webView { ForwardTool.execute(in: webView) }
+        case .reload:
+            if let webView { ReloadTool.execute(in: webView) }
+        case .hardRefresh:
+            if let webView { HardRefreshTool.execute(in: webView) }
+        case .stopLoading:
+            if let webView { StopLoadingTool.execute(in: webView) }
+        case .findOnPage:
+            showFindOnPage = true
+        case .scrollToTop:
+            if let webView { ScrollToTopTool.execute(in: webView) }
+        case .scrollToBottom:
+            if let webView { ScrollToBottomTool.execute(in: webView) }
+        case .readerMode:
+            showReaderMode = true
+        case .toggleDarkMode:
+            if let webView { DarkModeTool.toggle(in: webView) { _ in } }
+        case .newTab:
+            NewTabTool.execute(viewModel: browserViewModel)
+        case .newPrivateTab:
+            NewPrivateTabTool.execute(viewModel: browserViewModel)
+        case .duplicateTab:
+            DuplicateTabTool.execute(viewModel: browserViewModel)
+        case .closeThisTab:
+            if let activeId = browserViewModel.activeTabId {
+                CloseTabTool.execute(viewModel: browserViewModel, id: activeId)
+            }
+        case .closeAllTabs:
+            CloseAllTabsTool.execute(viewModel: browserViewModel)
+        case .closeOtherTabs:
+            CloseOtherTabsTool.execute(viewModel: browserViewModel)
+        case .viewAllTabs:
+            showAllTabs = true
+        case .viewPrivateTabs:
+            showPrivateTabs = true
+        case .viewPageSource:
+            if let webView {
+                ViewPageSourceTool.execute(webView: webView) { source in
+                    pageSourceContent = source
+                    showPageSource = true
                 }
             }
-
-            Divider()
-
-            // Standard Navigation
-            Group {
-                Button(action: { browserViewModel.goBack() }) {
-                    Label("Back", systemImage: "chevron.left")
-                }.disabled(!browserViewModel.canGoBack)
-                Button(action: { browserViewModel.goForward() }) {
-                    Label("Forward", systemImage: "chevron.right")
-                }.disabled(!browserViewModel.canGoForward)
-                Button(action: { browserViewModel.reload() }) {
-                    Label("Reload", systemImage: "arrow.clockwise")
+        case .copyURL:
+            CopyURLTool.execute(urlString: browserViewModel.urlString)
+        case .copyPageTitle:
+            CopyPageTitleTool.execute(title: browserViewModel.activeTab?.title ?? "")
+        case .saveAsPDF:
+            if let webView {
+                SaveAsPDFTool.execute(webView: webView) { _ in }
+            }
+        case .savePageOffline:
+            if let webView {
+                SavePageOfflineTool.execute(webView: webView) { _ in }
+            }
+        case .share:
+            ShareTool.execute(url: browserViewModel.urlString)
+        case .pictureInPicture:
+            if let webView { PictureInPictureTool.execute(in: webView) }
+        case .muteTab:
+            if let webView { MuteTabTool.mute(in: webView) }
+        case .unmuteTab:
+            if let webView { MuteTabTool.unmute(in: webView) }
+        case .listenToPage:
+            ttsManager.speak(browserViewModel.activeTab?.title ?? browserViewModel.urlString)
+        case .toggleJavaScript:
+            if let webView { JavaScriptToggleTool.execute(in: webView, isEnabled: false) }
+        case .clearCookiesForSite:
+            if let webView { ClearSiteCookiesTool.execute(for: webView) {} }
+        case .clearCacheForSite:
+            if let webView { ClearSiteCacheTool.execute(for: webView) {} }
+        case .toggleAdBlocker:
+            browserViewModel.adBlocker.isEnabled.toggle()
+        case .summarizePage:
+            showSummary = true
+        case .askThePage:
+            showAIChat = true
+        case .keyTakeaways, .toneAnalysis, .extractTasks:
+            showAIChat = true
+        case .inspectElement:
+            developerDOMInfo = nil
+            showDeveloperTools = true
+            if let webView {
+                InspectElementTool.inspect(webView: webView) { info in
+                    developerDOMInfo = info
                 }
             }
-
-            Divider()
-
-            // AI Features
-            Group {
-                Button(action: { showSummary = true }) { Label("Summarize Page", systemImage: "text.magnifyingglass") }
-                Button(action: { showAIChat = true }) { Label("Ask the Page", systemImage: "bubble.left.and.bubble.right") }
+        case .viewNetworkLogs:
+            showNetworkLogs = true
+        case .switchUserAgent:
+            if let webView { SwitchUserAgentTool.toggle(webView: webView) }
+        case .favoritePage:
+            FavoriteTool.execute(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString, favoritesManager: favoritesManager)
+        case .removeFromFavorites:
+            RemoveFromFavoritesTool.execute(url: browserViewModel.urlString, favoritesManager: favoritesManager)
+        case .viewDownloads:
+            showDownloads = true
+        case .viewHistory:
+            showHistory = true
+        case .addToCollection:
+            showAddToCollection = true
+        case .addNote:
+            AddNoteTool.execute(url: browserViewModel.urlString, notesManager: notesManager) {
+                showNotes = true
             }
-
-            Divider()
-
-            // Advanced / Tools
-            Group {
-                Button(action: { showFindOnPage = true }) { Label("Find On Page", systemImage: "doc.text.magnifyingglass") }
-                Button(action: { showReaderMode = true }) { Label("Reader Mode", systemImage: "text.justify.left") }
-                Button(action: {
-                    guard let webView = browserViewModel.activeTab?.webView else { return }
-                    InspectElementTool.inspect(webView: webView) { info in
-                        developerDOMInfo = info
-                        showDeveloperTools = true
-                    }
-                }) { Label("Developer Tools", systemImage: "hammer") }
-                Button(action: { showNetworkLogs = true }) { Label("Network Logs", systemImage: "network") }
+        case .hideElements:
+            if let webView {
+                HideElementsTool.execute(webView: webView, elementHiderManager: elementHiderManager)
             }
-
-            Divider()
-
-            // General
-            Group {
-                Button(action: { showAllTabs = true }) { Label("All Tabs", systemImage: "square.on.square") }
-                Button(action: {
-                    favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
-                }) { Label("Bookmark This Page", systemImage: "bookmark") }
-                Button(action: { showBookmarks = true }) { Label("Bookmarks", systemImage: "book") }
-                Button(action: {
-                    saveForLaterManager.add(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
-                }) { Label("Save For Later", systemImage: "bookmark.circle") }
-                Button(action: { showSaveForLater = true }) { Label("Saved For Later", systemImage: "clock.arrow.circlepath") }
-                Button(action: { showDownloads = true }) { Label("Downloads", systemImage: "arrow.down.circle") }
-                Button(action: { showHistory = true }) { Label("History", systemImage: "clock") }
-                Button(action: { showSettings = true }) { Label("Settings", systemImage: "gear") }
+        case .revertToOriginal:
+            if let webView {
+                RevertToOriginalTool.execute(url: browserViewModel.activeTab?.url, elementHiderManager: elementHiderManager, webView: webView)
             }
+        case .websiteStyling:
+            WebsiteStylingTool.execute {
+                showWebsiteStyle = true
+            }
+        case .divider:
+            break
         }
     }
 

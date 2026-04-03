@@ -6,35 +6,39 @@ struct SearchSuggestionsView: View {
     var onSelect: (String) -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(suggestionManager.suggestions, id: \.self) { suggestion in
-                    Button(action: {
-                        onSelect(suggestion)
-                    }) {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.secondary)
+        ZStack(alignment: .top) {
+            Color.black.opacity(0.1)
+                .ignoresSafeArea()
 
-                            highlightedText(suggestion, query: query)
-                                .foregroundColor(.primary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(suggestionManager.suggestions, id: \.self) { suggestion in
+                        Button(action: {
+                            onSelect(suggestion)
+                        }) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.secondary)
 
-                            Spacer()
+                                highlightedText(suggestion, query: query)
+                                    .foregroundColor(.primary)
 
-                            Image(systemName: "arrow.up.left")
-                                .foregroundColor(.secondary)
+                                Spacer()
+
+                                Image(systemName: "arrow.up.left")
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color.primary.opacity(0.001))
                         }
-                        .padding()
-                        .background(Color.primary.opacity(0.001))
+                        Divider()
                     }
-                    Divider()
                 }
+                .padding(.top, 120)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .background(.ultraThinMaterial)
-            .cornerRadius(15)
-            .padding()
         }
-        .frame(maxHeight: 300)
     }
 
     private func highlightedText(_ text: String, query: String) -> some View {

@@ -17,16 +17,23 @@ class WebsiteStyleManager: ObservableObject {
     }
 
     func setStyle(_ style: WebsiteStyle, for domain: String) {
-        styles[domain] = style
+        let key = normalizeDomain(domain)
+        guard !key.isEmpty else { return }
+        var normalizedStyle = style
+        normalizedStyle.fontSize = min(max(normalizedStyle.fontSize, 50), 300)
+        styles[key] = normalizedStyle
         saveData()
     }
 
     func getStyle(for domain: String) -> WebsiteStyle {
-        return styles[domain] ?? WebsiteStyle()
+        let key = normalizeDomain(domain)
+        guard !key.isEmpty else { return WebsiteStyle() }
+        return styles[key] ?? WebsiteStyle()
     }
 
     func getInjectionScript(for domain: String) -> String {
-        guard let style = styles[domain] else { return "" }
+        let key = normalizeDomain(domain)
+        guard let style = styles[key] else { return "" }
         return """
         (function() {
             const css = `
@@ -40,11 +47,17 @@ class WebsiteStyleManager: ObservableObject {
                     background-color: inherit !important;
                 }
             `;
-            const style = document.createElement('style');
-            style.innerHTML = css;
-            document.head.appendChild(style);
+            const styleElement = document.createElement('style');
+            styleElement.innerHTML = css;
+            document.head.appendChild(styleElement);
         })();
         """
+    }
+
+    private func normalizeDomain(_ domain: String) -> String {
+        domain
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     private func saveData() {

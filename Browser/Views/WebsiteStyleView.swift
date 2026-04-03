@@ -6,6 +6,7 @@ struct WebsiteStyleView: View {
 
     var domain: String
     @State private var currentStyle = WebsiteStyle()
+    private var normalizedDomain: String { domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
 
     var body: some View {
         NavigationView {
@@ -32,9 +33,9 @@ struct WebsiteStyleView: View {
                     }
                 }
             }
-            .navigationTitle("Style: \(domain)")
+            .navigationTitle("Style: \(normalizedDomain.isEmpty ? "Website" : normalizedDomain)")
             .onAppear {
-                currentStyle = styleManager.getStyle(for: domain)
+                currentStyle = styleManager.getStyle(for: normalizedDomain)
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -42,12 +43,12 @@ struct WebsiteStyleView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        styleManager.setStyle(currentStyle, for: domain)
+                        styleManager.setStyle(currentStyle, for: normalizedDomain)
                         dismiss()
                     }
+                    .disabled(normalizedDomain.isEmpty)
                 }
             }
         }
     }
 }
-
