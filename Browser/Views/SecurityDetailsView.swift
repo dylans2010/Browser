@@ -50,7 +50,6 @@ private func formatted(_ date: Date?) -> String {
     guard let date else { return "Unavailable" }
     return date.formatted(date: .abbreviated, time: .omitted)
 }
-```
 
 }
 
@@ -59,7 +58,6 @@ private var completion: ((SecurityDetails?) -> Void)?
 private var requestedURL: URL?
 private var didFinish = false
 
-```
 func fetch(for url: URL, completion: @escaping (SecurityDetails?) -> Void) {
     guard let host = url.host else {
         completion(nil)
