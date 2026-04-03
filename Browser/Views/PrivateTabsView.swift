@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 16.0, *)
 struct PrivateTabsView: View {
     @ObservedObject var viewModel: BrowserViewModel
     @AppStorage("privatePasscode") var storedPasscode: String = ""

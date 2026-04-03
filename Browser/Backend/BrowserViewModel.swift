@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 
+@available(iOS 16.0, *)
 class BrowserViewModel: NSObject, ObservableObject {
     @Published var tabs: [TabItem] = []
     @Published var activeTabId: UUID?
