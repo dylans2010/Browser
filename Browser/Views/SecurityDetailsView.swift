@@ -59,6 +59,8 @@ struct SecurityDetailsView: View {
 
 final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
     private var completion: ((SecurityDetails?) -> Void)?
+    private var requestedURL: URL?
+    private var didFinish = false
 
     func fetch(for url: URL, completion: @escaping (SecurityDetails?) -> Void) {
         guard let host = url.host else {
@@ -67,6 +69,8 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
         }
 
         self.completion = completion
+        requestedURL = url
+        didFinish = false
         var components = URLComponents()
         components.scheme = "https"
         components.host = host
@@ -124,7 +128,7 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
             }
         }
 
-        let info = SecurityDetails(
+        var info = SecurityDetails(
             host: challenge.protectionSpace.host,
             isSecureConnection: true,
             transport: challenge.protectionSpace.protocol ?? "HTTPS",
@@ -134,9 +138,25 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
             validTo: validTo
         )
 
-        DispatchQueue.main.async {
-            self.completion?(info)
-            self.completion = nil
+        if needsRemoteFallback(for: info), let requestedURL {
+            // Local certificate APIs (Security framework) are preferred for trust-chain details.
+            // Remote lookup is only used as a best-effort supplement when issuer/validity fields are unavailable locally.
+            fetchRemoteCertificateDetails(for: requestedURL) { remote in
+                if let remote {
+                    info = SecurityDetails(
+                        host: info.host,
+                        isSecureConnection: info.isSecureConnection,
+                        transport: info.transport,
+                        certificateCommonName: info.certificateCommonName,
+                        issuerSummary: info.issuerSummary == "Unavailable" ? remote.issuerSummary : info.issuerSummary,
+                        validFrom: info.validFrom ?? remote.validFrom,
+                        validTo: info.validTo ?? remote.validTo
+                    )
+                }
+                self.finish(with: info)
+            }
+        } else {
+            finish(with: info)
         }
 
         completionHandler(.performDefaultHandling, URLCredential(trust: trust))
@@ -145,10 +165,139 @@ final class SecurityDetailsFetcher: NSObject, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
             _ = error
-            DispatchQueue.main.async {
-                self.completion?(nil)
-                self.completion = nil
+            finish(with: nil)
+        }
+    }
+
+    private func needsRemoteFallback(for details: SecurityDetails) -> Bool {
+        details.issuerSummary == "Unavailable" || details.validFrom == nil || details.validTo == nil
+    }
+
+    private func finish(with details: SecurityDetails?) {
+        guard !didFinish else { return }
+        didFinish = true
+        DispatchQueue.main.async {
+            self.completion?(details)
+            self.completion = nil
+            self.requestedURL = nil
+        }
+    }
+
+    private struct RemoteCertificateDetails {
+        let issuerSummary: String
+        let validFrom: Date?
+        let validTo: Date?
+    }
+
+    private struct AllOriginsResponse: Decodable {
+        let contents: String
+    }
+
+    private func fetchRemoteCertificateDetails(for url: URL, completion: @escaping (RemoteCertificateDetails?) -> Void) {
+        let encoded = url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? url.absoluteString
+        guard let fetchURL = URL(string: "https://api.allorigins.win/get?url=\(encoded)") else {
+            completion(nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: fetchURL) { data, _, error in
+            guard error == nil, let data else {
+                completion(nil)
+                return
+            }
+
+            guard let response = try? JSONDecoder().decode(AllOriginsResponse.self, from: data) else {
+                completion(nil)
+                return
+            }
+
+            completion(self.parseRemoteCertificateDetails(from: response.contents))
+        }.resume()
+    }
+
+    private func parseRemoteCertificateDetails(from contents: String) -> RemoteCertificateDetails {
+        var issuer = "Unavailable"
+        var validFrom: Date?
+        var validTo: Date?
+
+        if let data = contents.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            issuer = value(in: json, keys: ["issuerSummary", "issuer", "issuerName"]) ?? "Unavailable"
+            validFrom = date(in: json, keys: ["validFrom", "notBefore", "validityStart"])
+            validTo = date(in: json, keys: ["validTo", "notAfter", "validityEnd"])
+        }
+
+        if issuer == "Unavailable" {
+            issuer = firstMatch(in: contents, pattern: "(?i)issuer\\s*[:=]\\s*([^\\n<]+)") ?? "Unavailable"
+        }
+        if validFrom == nil {
+            validFrom = parseDate(from: firstMatch(in: contents, pattern: "(?i)(not before|valid from)\\s*[:=]\\s*([^\\n<]+)", captureGroup: 2))
+        }
+        if validTo == nil {
+            validTo = parseDate(from: firstMatch(in: contents, pattern: "(?i)(not after|valid to|expires?)\\s*[:=]\\s*([^\\n<]+)", captureGroup: 2))
+        }
+
+        return RemoteCertificateDetails(issuerSummary: issuer, validFrom: validFrom, validTo: validTo)
+    }
+
+    private func value(in json: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = json[key] as? String, !value.isEmpty { return value }
+            if let nested = json[key] as? [String: Any],
+               let value = nested["name"] as? String, !value.isEmpty { return value }
+        }
+        if let validity = json["validity"] as? [String: Any] {
+            return value(in: validity, keys: keys)
+        }
+        return nil
+    }
+
+    private func date(in json: [String: Any], keys: [String]) -> Date? {
+        for key in keys {
+            if let str = json[key] as? String, let parsed = parseDate(from: str) {
+                return parsed
             }
         }
+        if let validity = json["validity"] as? [String: Any] {
+            return date(in: validity, keys: keys)
+        }
+        return nil
+    }
+
+    private func parseDate(from raw: String?) -> Date? {
+        guard let raw else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+
+        let iso = ISO8601DateFormatter()
+        if let parsed = iso.date(from: value) { return parsed }
+
+        let fmts = [
+            "yyyy-MM-dd'T'HH:mm:ssZ",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+            "yyyy-MM-dd",
+            "MMM d yyyy",
+            "MMM d, yyyy",
+            "MMMM d, yyyy"
+        ]
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        for format in fmts {
+            formatter.dateFormat = format
+            if let parsed = formatter.date(from: value) {
+                return parsed
+            }
+        }
+        return nil
+    }
+
+    private func firstMatch(in source: String, pattern: String, captureGroup: Int = 1) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+              match.numberOfRanges > captureGroup,
+              let range = Range(match.range(at: captureGroup), in: source) else {
+            return nil
+        }
+        return String(source[range]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
