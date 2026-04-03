@@ -17,26 +17,39 @@ struct SearchSuggestionsView: View {
                         Button(action: {
                             onSelect(suggestion)
                         }) {
-                            HStack {
+                            HStack(spacing: 15) {
                                 Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16))
                                     .foregroundColor(.secondary)
+                                    .frame(width: 30)
 
                                 highlightedText(suggestion, query: query)
+                                    .font(.system(size: 17))
                                     .foregroundColor(.primary)
 
                                 Spacer()
 
                                 Image(systemName: "arrow.up.left")
+                                    .font(.system(size: 14))
                                     .foregroundColor(.secondary)
                             }
-                            .padding()
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 20)
                             .background(Color.primary.opacity(0.001))
                         }
+
                         Divider()
+                            .padding(.leading, 65)
                     }
                 }
-                .padding(.top, 120)
-                .padding(.bottom, 160)
+                .padding(.top, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(Color(UIColor.secondarySystemBackground).opacity(0.6))
+                        .padding(.horizontal)
+                )
+                .padding(.top, 140) // Below the address bar area
+                .padding(.bottom, 300) // Padding for keyboard area
             }
         }
     }

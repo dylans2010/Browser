@@ -20,6 +20,16 @@ struct SettingsView: View {
     @AppStorage("saveDataWhilePrivate") var saveDataWhilePrivate: Bool = false
     @AppStorage("privatePasscode") var privatePasscode: String = ""
 
+    // Search Engine
+    @AppStorage("searchEngine") var searchEngine: String = "Google"
+
+    // Address Bar Customization
+    @AppStorage("addressBarAlignment") var addressBarAlignment: String = "Center"
+    @AppStorage("addressBarSize") var addressBarSize: Double = 1.0
+    @AppStorage("showSiteIcon") var showSiteIcon: Bool = true
+    @AppStorage("showReadTime") var showReadTime: Bool = true
+    @AppStorage("addressBarGestures") var addressBarGestures: Bool = true
+
     @EnvironmentObject var aiConfig: AIConfiguration
     @EnvironmentObject var toolbarManager: ToolbarManager
     @EnvironmentObject var historyManager: HistoryManager
@@ -40,6 +50,7 @@ struct SettingsView: View {
             toolbarSettings
             aiSettings
             privateBrowsingSettings
+            permissionsSettings
             importSettings
             experimentalSettings
         }
@@ -105,6 +116,33 @@ struct SettingsView: View {
                     Text("Compact").tag("Compact")
                 }
             })
+
+            Section("Address Bar Customization", content: {
+                Picker("Alignment", selection: $addressBarAlignment) {
+                    Text("Left").tag("Left")
+                    Text("Center").tag("Center")
+                    Text("Right").tag("Right")
+                }
+
+                VStack(alignment: .leading) {
+                    Text("Bar Size: \(Int(addressBarSize * 100))%")
+                    Slider(value: $addressBarSize, in: 0.8...1.2, step: 0.05)
+                }
+
+                Toggle("Show Site Icon", isOn: $showSiteIcon)
+                Toggle("Show Read Time", isOn: $showReadTime)
+                Toggle("Enable Swipe Gestures", isOn: $addressBarGestures)
+            })
+
+            Section("Search Engine") {
+                Picker("Search Engine", selection: $searchEngine) {
+                    Text("Google").tag("Google")
+                    Text("Bing").tag("Bing")
+                    Text("DuckDuckGo").tag("DuckDuckGo")
+                    Text("Ecosia").tag("Ecosia")
+                    Text("Yahoo").tag("Yahoo")
+                }
+            }
         }
         .tabItem { Label("Appearance", systemImage: "paintbrush") }
     }
@@ -194,6 +232,11 @@ struct SettingsView: View {
             })
         }
         .tabItem { Label("AI", systemImage: "brain") }
+    }
+
+    private var permissionsSettings: some View {
+        AppPermissionsView()
+            .tabItem { Label("Permissions", systemImage: "lock.shield") }
     }
 
     private var privateBrowsingSettings: some View {
