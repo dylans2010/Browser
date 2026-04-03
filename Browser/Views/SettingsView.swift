@@ -177,16 +177,16 @@ struct SettingsView: View {
     private var importSettings: some View {
         List {
             Section(
-                "Data Migration",
+                header: Text("Data Migration"),
+                footer: {
+                    Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
+                },
                 content: {
                     Button(action: {
                         showFilePicker = true
                     }) {
                         Label("Import From Browsers", systemImage: "square.and.arrow.down")
                     }
-                },
-                footer: {
-                    Text("Import bookmarks and history from a .zip file or browser-exported files (.xml, .json).")
                 }
             )
         }
