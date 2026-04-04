@@ -18,50 +18,75 @@ struct AIChatView: View {
 
     var body: some View {
         NavigationView {
-            VStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(messages) { message in
-                            HStack {
-                                if message.role == "user" { Spacer() }
+            ZStack {
+                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
 
-                                Text(message.content)
-                                    .padding(10)
-                                    .background(message.role == "user" ? Color.blue : Color.gray.opacity(0.2))
-                                    .foregroundColor(message.role == "user" ? .white : .primary)
-                                    .cornerRadius(12)
-
-                                if message.role != "user" { Spacer() }
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 16) {
+                                ForEach(messages) { message in
+                                    ChatBubble(message: message)
+                                        .id(message.id)
+                                }
+                            }
+                            .padding()
+                        }
+                        .onChange(of: messages.count) { _ in
+                            if let lastId = messages.last?.id {
+                                withAnimation {
+                                    proxy.scrollTo(lastId, anchor: .bottom)
+                                }
                             }
                         }
                     }
-                    .padding()
-                }
 
-                HStack {
-                    TextField("Ask something about this page...", text: $userInput)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .disabled(isSending)
+                    // Bottom Input Area
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            TextField("Ask something about this page...", text: $userInput, axis: .vertical)
+                                .lineLimit(1...5)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
+                                .cornerRadius(20)
+                                .disabled(isSending)
 
-                    if isSending {
-                        ProgressView()
-                            .padding(.horizontal, 8)
-                    } else {
-                        Button(action: sendMessage) {
-                            Image(systemName: "paperplane.fill")
+                            if isSending {
+                                ProgressView()
+                                    .frame(width: 44, height: 44)
+                            } else {
+                                Button(action: sendMessage) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.system(size: 32))
+                                        .symbolRenderingMode(.hierarchical)
+                                        .foregroundColor(.blue)
+                                }
+                                .disabled(userInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
                         }
-                        .disabled(userInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .padding(.horizontal)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
                     }
+                    .background(.ultraThinMaterial)
                 }
-                .padding()
             }
             .navigationTitle("Ask the Page")
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.blue)
+                        Text("AI Assistant")
+                            .font(.headline)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
             .onAppear {
@@ -97,5 +122,41 @@ struct AIChatView: View {
             }
             isSending = false
         }
+    }
+}
+
+@available(iOS 16.0, *)
+struct ChatBubble: View {
+    let message: Message
+
+    var body: some View {
+        HStack {
+            if message.role == "user" { Spacer() }
+
+            VStack(alignment: message.role == "user" ? .trailing : .leading, spacing: 4) {
+                Text(message.content)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(message.role == "user" ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                    .foregroundColor(message.role == "user" ? .white : .primary)
+                    .clipShape(BubbleShape(isUser: message.role == "user"))
+                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+            }
+
+            if message.role != "user" { Spacer() }
+        }
+    }
+}
+
+struct BubbleShape: Shape {
+    var isUser: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: isUser ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight],
+            cornerRadii: CGSize(width: 18, height: 18)
+        )
+        return Path(path.cgPath)
     }
 }

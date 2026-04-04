@@ -84,21 +84,18 @@ struct BrowserView: View {
             }
 
             // Address bar overlay (Safari-like)
-            if browserViewModel.activeTab != nil {
-                VStack {
-                    Spacer()
-                    AddressBarView(
-                        viewModel: browserViewModel,
-                        isFocused: $isAddressBarFocused,
-                        onCommit: { loadURL() },
-                        onBrowserAssistantTap: { showBrowserAssistant = true },
-                        menuItems: AnyView(toolbarMenuItems)
-                    )
-                    .padding(.bottom, isAddressBarFocused ? 20 : 40)
-                }
-                .padding(.bottom, isAddressBarFocused ? 0 : 0) // Ensures it follows keyboard naturally
-                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isAddressBarFocused)
+            VStack {
+                Spacer()
+                AddressBarView(
+                    viewModel: browserViewModel,
+                    isFocused: $isAddressBarFocused,
+                    onCommit: { loadURL() },
+                    onBrowserAssistantTap: { showBrowserAssistant = true },
+                    menuItems: AnyView(toolbarMenuItems)
+                )
+                .padding(.bottom, isAddressBarFocused ? 20 : 40)
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isAddressBarFocused)
 
             // Browser Assistant Overlay
             if showBrowserAssistant {
@@ -141,6 +138,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showAIChat) {
             AIChatView(viewModel: browserViewModel)
                 .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showReaderMode) {
             ReaderModeView(viewModel: browserViewModel)
@@ -211,7 +209,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showAutoNotes) {
             AutoNotesView(sourceURL: browserViewModel.urlString)
                 .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.fraction(0.3), .medium, .large])
         }
         .onAppear {
             browserViewModel.historyManager = historyManager
@@ -238,7 +236,7 @@ struct BrowserView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .edgesIgnoringSafeArea(.all)
             } else {
-                NewTabView()
+                NewTabView(onSearch: { loadURL() })
                     .environmentObject(browserViewModel)
                     .environmentObject(favoritesManager)
                     .environmentObject(historyManager)
@@ -291,7 +289,14 @@ struct BrowserView: View {
         }
         browserViewModel.urlString = input
         isAddressBarFocused = false
-        browserViewModel.loadURLString()
+
+        if let url = URL(string: input) {
+            if browserViewModel.activeTab != nil {
+                browserViewModel.loadURLString()
+            } else {
+                browserViewModel.addTab(url: url)
+            }
+        }
     }
 
     private var toolbarMenuItems: some View {

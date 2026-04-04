@@ -6,10 +6,9 @@ struct NewTabView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var historyManager: HistoryManager
 
-    @StateObject private var suggestionManager = SearchSuggestionManager()
-    @FocusState private var isAddressBarFocused: Bool
-
     @AppStorage("homePageBackgroundStyle") var backgroundStyle: String = "Blurred Camera"
+
+    var onSearch: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -18,8 +17,6 @@ struct NewTabView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 30) {
                     headerSection
-
-                    searchSection
 
                     HStack(spacing: 15) {
                         weatherWidget
@@ -36,22 +33,6 @@ struct NewTabView: View {
                 .padding(.top, 60)
             }
 
-            if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
-                SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
-                    browserViewModel.urlString = selected
-                    loadURL()
-                    isAddressBarFocused = false
-                }
-                .background(.ultraThinMaterial)
-                .zIndex(10)
-            }
-        }
-        .onChange(of: browserViewModel.urlString) { newValue in
-            if isAddressBarFocused {
-                Task {
-                    await suggestionManager.updateSuggestions(for: newValue, history: historyManager.history, favorites: favoritesManager.favorites, learningModel: SearchLearningModel.shared)
-                }
-            }
         }
     }
 
@@ -85,12 +66,6 @@ struct NewTabView: View {
         return "Good Evening"
     }
 
-    private var searchSection: some View {
-        AddressBarView(viewModel: browserViewModel, isFocused: $isAddressBarFocused) {
-            loadURL()
-        }
-        .padding(.horizontal)
-    }
 
     private var weatherWidget: some View {
         VStack(alignment: .leading) {
@@ -204,7 +179,7 @@ struct NewTabView: View {
                     ForEach(SearchLearningModel.shared.searchFrequencies.keys.sorted(), id: \.self) { search in
                         Button(action: {
                             browserViewModel.urlString = search
-                            loadURL()
+                            onSearch()
                         }) {
                             Text(search)
                                 .padding(.horizontal, 16)
@@ -220,17 +195,4 @@ struct NewTabView: View {
         }
     }
 
-    private func loadURL() {
-        var input = browserViewModel.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if input.contains(".") && !input.contains(" ") {
-            if !input.contains("://") { input = "https://\(input)" }
-        } else {
-            let query = input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input
-            input = "https://www.google.com/search?q=\(query)"
-            SearchLearningModel.shared.trackSearch(query: input)
-        }
-        browserViewModel.urlString = input
-        isAddressBarFocused = false
-        browserViewModel.loadURLString()
-    }
 }
