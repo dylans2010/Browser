@@ -17,6 +17,7 @@ struct AddressBarView: View {
     @AppStorage("showReadTime") var showReadTime: Bool = true
     @AppStorage("addressBarGestures") var enableGestures: Bool = true
     @AppStorage("showBrowserAssistant") var showBrowserAssistant: Bool = true
+    @AppStorage("alwaysShowAddressBar") var alwaysShowAddressBar: Bool = true
 
     // Fine tuning
     @AppStorage("addressBarCornerRadius") var barCornerRadius: Double = 25.0

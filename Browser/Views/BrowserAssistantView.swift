@@ -14,90 +14,121 @@ struct BrowserAssistantView: View {
 
     var body: some View {
         ZStack {
-            // Fullscreen Glass Overlay
-            Color.clear
-                .background(.ultraThinMaterial)
-                .edgesIgnoringSafeArea(.all)
-
-            VStack(spacing: 24) {
-                HStack {
-                    Spacer()
-                    Button(action: {
+            // Non-obstructive background (just handles dismissal if tapping outside banners)
+            Color.black.opacity(0.001)
+                .onTapGesture {
+                    if selectionManager.selectedText.isEmpty {
                         selectionManager.disableSelectionMode()
                         dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                            .padding()
-                            .background(Circle().fill(.ultraThinMaterial))
                     }
                 }
-                .padding()
+
+            VStack {
+                // Top Selection Mode Banner
+                if selectionManager.selectedText.isEmpty {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.blue)
+                        Text("Select an element to analyze")
+                            .font(.subheadline.bold())
+
+                        Spacer()
+
+                        Button(action: {
+                            selectionManager.disableSelectionMode()
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.title3)
+                        }
+                    }
+                    .padding()
+                    .background(Capsule().fill(.ultraThinMaterial))
+                    .padding(.top, 60)
+                    .padding(.horizontal)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 Spacer()
 
                 if !selectionManager.selectedText.isEmpty {
-                    // Assistant Action Sheet
-                    VStack(spacing: 20) {
-                        Text("Selected Content")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-
-                        ScrollView {
-                            Text(selectionManager.selectedText)
-                                .font(.body)
-                                .lineLimit(10)
-                                .padding()
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
-                        }
-                        .frame(maxHeight: 200)
-
-                        TextField("What do you want AI to do?", text: $userInput)
-                            .textFieldStyle(.roundedBorder)
-                            .padding(.horizontal)
-
-                        HStack(spacing: 12) {
-                            actionButton(title: "Summarize", action: { runAI(instruction: "Summarize the following content:") })
-                            actionButton(title: "Explain", action: { runAI(instruction: "Explain the following content clearly:") })
-                            actionButton(title: "Rewrite", action: { runAI(instruction: "Rewrite the following content to be more engaging:") })
-                        }
-
-                        if !userInput.isEmpty {
-                            Button("Execute Custom Action") {
-                                runAI(instruction: userInput)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                    }
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 24).fill(.ultraThinMaterial))
-                    .padding()
-                    .transition(.move(edge: .bottom))
-                } else {
+                    // Floating Action Card at the bottom
                     VStack(spacing: 16) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 64))
-                            .foregroundColor(.blue)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Selected Content")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.secondary)
+                                Text(selectionManager.selectedText)
+                                    .font(.system(size: 14))
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Button(action: {
+                                selectionManager.selectedText = ""
+                                if let webView = browserViewModel.activeTab?.webView {
+                                    selectionManager.enableSelectionMode(in: webView)
+                                }
+                            }) {
+                                Image(systemName: "arrow.counterclockwise.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal)
 
-                        Text("Browser Assistant")
-                            .font(.largeTitle.bold())
+                        Divider()
 
-                        Text("Tap on any element or text on the page to analyze it with AI.")
-                            .font(.headline)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                        HStack(spacing: 10) {
+                            actionButton(title: "Summarize", icon: "text.alignleft") { runAI(instruction: "Summarize the following content:") }
+                            actionButton(title: "Explain", icon: "info.circle") { runAI(instruction: "Explain the following content clearly:") }
+                            actionButton(title: "Rewrite", icon: "pencil") { runAI(instruction: "Rewrite the following content to be more engaging:") }
+                        }
+                        .padding(.horizontal)
+
+                        HStack {
+                            TextField("Ask AI anything...", text: $userInput)
+                                .textFieldStyle(.plain)
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
+
+                            if !userInput.isEmpty {
+                                Button(action: { runAI(instruction: userInput) }) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.title)
+                                        .foregroundColor(.blue)
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                            }
+
+                            Button(action: {
+                                selectionManager.disableSelectionMode()
+                                dismiss()
+                            }) {
+                                Text("Done")
+                                    .bold()
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
                     }
+                    .padding(.vertical)
+                    .background(RoundedRectangle(cornerRadius: 24).fill(.ultraThinMaterial))
+                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
                     .padding()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-
-                Spacer()
             }
 
             if isLoading {
-                ProgressView("AI is thinking...")
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
+                ZStack {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    ProgressView("AI is thinking...")
+                        .padding(20)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                }
             }
         }
         .sheet(isPresented: $showResult) {
@@ -110,10 +141,19 @@ struct BrowserAssistantView: View {
         }
     }
 
-    private func actionButton(title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+    private func actionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.headline)
+                Text(title)
+                    .font(.caption2.bold())
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(12)
+        }
     }
 
     private func runAI(instruction: String) {
