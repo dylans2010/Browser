@@ -32,6 +32,10 @@ struct DarkModeTool {
         webView.evaluateJavaScript(js)
     }
 
+    static func execute(webView: WKWebView) {
+        toggle(in: webView) { _ in }
+    }
+
     static func toggle(in webView: WKWebView, completion: @escaping (Bool) -> Void) {
         let js = "!!document.getElementById('__browserDarkMode')"
         webView.evaluateJavaScript(js) { result, _ in

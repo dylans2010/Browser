@@ -347,17 +347,17 @@ struct BrowserView: View {
         case .reload: browserViewModel.reload()
         case .hardRefresh:
             if let webView = browserViewModel.activeTab?.webView {
-                HardRefreshTool.execute(webView: webView)
+                HardRefreshTool.execute(in: webView)
             }
         case .stopLoading: browserViewModel.stopLoading()
         case .findOnPage: showFindOnPage = true
         case .scrollToTop:
             if let webView = browserViewModel.activeTab?.webView {
-                ScrollToTopTool.execute(webView: webView)
+                ScrollToTopTool.execute(in: webView)
             }
         case .scrollToBottom:
             if let webView = browserViewModel.activeTab?.webView {
-                ScrollToBottomTool.execute(webView: webView)
+                ScrollToBottomTool.execute(in: webView)
             }
         case .readerMode: showReaderMode = true
         case .toggleDarkMode:
@@ -405,7 +405,7 @@ struct BrowserView: View {
             }
         case .savePageOffline:
             if let webView = browserViewModel.activeTab?.webView {
-                SavePageOfflineTool.execute(webView: webView)
+                SavePageOfflineTool.execute(webView: webView) { _ in }
             }
         case .share:
             let urlToShare = NoTrackingParameters.clean(browserViewModel.urlString)
@@ -418,7 +418,7 @@ struct BrowserView: View {
             }
         case .pictureInPicture:
             if let webView = browserViewModel.activeTab?.webView {
-                PictureInPictureTool.execute(webView: webView)
+                PictureInPictureTool.execute(in: webView)
             }
         case .muteTab:
             if let webView = browserViewModel.activeTab?.webView {
@@ -434,18 +434,18 @@ struct BrowserView: View {
             }
         case .toggleJavaScript:
             if let webView = browserViewModel.activeTab?.webView {
-                JavaScriptToggleTool.execute(webView: webView)
+                JavaScriptToggleTool.execute(in: webView, isEnabled: true)
             }
         case .clearCookiesForSite:
-            if let url = browserViewModel.activeTab?.url {
-                ClearSiteCookiesTool.execute(url: url)
+            if let webView = browserViewModel.activeTab?.webView {
+                ClearSiteCookiesTool.execute(for: webView, completion: { })
             }
         case .clearCacheForSite:
-            if let url = browserViewModel.activeTab?.url {
-                ClearSiteCacheTool.execute(url: url)
+            if let webView = browserViewModel.activeTab?.webView {
+                ClearSiteCacheTool.execute(for: webView, completion: { })
             }
         case .toggleAdBlocker:
-            ToggleAdBlockerTool.execute()
+            ToggleAdBlockerTool.execute(for: browserViewModel.activeTab?.url?.host ?? "")
         case .summarizePage: showSummary = true
         case .askThePage: showAIChat = true
         case .keyTakeaways: showSummary = true // Logic reused
@@ -461,7 +461,7 @@ struct BrowserView: View {
             favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
         case .removeFromFavorites:
             if let favorite = favoritesManager.favorites.first(where: { $0.url == browserViewModel.urlString }) {
-                favoritesManager.removeFavorite(id: favorite.id)
+                favoritesManager.removeFavorite(url: favorite.url)
             }
         case .viewDownloads: showDownloads = true
         case .viewHistory: showHistory = true
