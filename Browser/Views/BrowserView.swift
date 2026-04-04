@@ -42,6 +42,8 @@ struct BrowserView: View {
     @State private var showBookmarks = false
     @State private var showSaveForLater = false
     @State private var showLanguageSelection = false
+    @State private var showBrowserAssistant = false
+    @State private var showAutoNotes = false
 
     // Data for sheets
     @State private var aiResultTitle = ""
@@ -89,12 +91,21 @@ struct BrowserView: View {
                         viewModel: browserViewModel,
                         isFocused: $isAddressBarFocused,
                         onCommit: { loadURL() },
+                        onBrowserAssistantTap: { showBrowserAssistant = true },
                         menuItems: AnyView(toolbarMenuItems)
                     )
                     .padding(.bottom, isAddressBarFocused ? 20 : 40)
                 }
                 .padding(.bottom, isAddressBarFocused ? 0 : 0) // Ensures it follows keyboard naturally
                 .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isAddressBarFocused)
+            }
+
+            // Browser Assistant Overlay
+            if showBrowserAssistant {
+                BrowserAssistantView()
+                    .environmentObject(browserViewModel)
+                    .transition(.opacity)
+                    .zIndex(100)
             }
         }
         .findNavigator(isPresented: $showFindOnPage)
@@ -197,6 +208,11 @@ struct BrowserView: View {
             }
             .presentationDetents([.medium])
         }
+        .sheet(isPresented: $showAutoNotes) {
+            AutoNotesView(sourceURL: browserViewModel.urlString)
+                .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
+                .presentationDetents([.medium, .large])
+        }
         .onAppear {
             browserViewModel.historyManager = historyManager
             browserViewModel.downloadManager = downloadManager
@@ -282,6 +298,12 @@ struct BrowserView: View {
         Group {
             // New Tools
             Group {
+                Button(action: { showBrowserAssistant = true }) {
+                    Label("Browser Assistant", systemImage: "sparkles")
+                }
+                Button(action: { showAutoNotes = true }) {
+                    Label("Auto Notes", systemImage: "note.text.badge.plus")
+                }
                 Button(action: { showAddNote = true }) {
                     Label("Add Note", systemImage: "note.text.badge.plus")
                 }
@@ -353,6 +375,20 @@ struct BrowserView: View {
             // General
             Group {
                 Button(action: { showAllTabs = true }) { Label("All Tabs", systemImage: "square.on.square") }
+                Button(action: {
+                    let urlToCopy = NoTrackingParameters.clean(browserViewModel.urlString)
+                    UIPasteboard.general.string = urlToCopy
+                }) { Label("Copy URL", systemImage: "doc.on.doc") }
+                Button(action: {
+                    let urlToShare = NoTrackingParameters.clean(browserViewModel.urlString)
+                    if let url = URL(string: urlToShare) {
+                        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootVC = windowScene.windows.first?.rootViewController {
+                            rootVC.present(av, animated: true, completion: nil)
+                        }
+                    }
+                }) { Label("Share URL", systemImage: "square.and.arrow.up") }
                 Button(action: {
                     favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
                 }) { Label("Bookmark This Page", systemImage: "bookmark") }

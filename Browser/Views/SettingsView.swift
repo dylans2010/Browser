@@ -45,6 +45,9 @@ struct SettingsView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var collectionsManager: CollectionsManager
 
+    @AppStorage("autoNotesEnabled") var autoNotesEnabled: Bool = true
+    @AppStorage("removeTrackingParameters") var removeTrackingParameters: Bool = true
+
     @State private var showExportSheet = false
     @State private var exportURL: URL?
 
@@ -58,6 +61,7 @@ struct SettingsView: View {
             appearanceSettings
             toolbarSettings
             aiSettings
+            autoNotesSettings
             privateBrowsingSettings
             permissionsSettings
             importSettings
@@ -268,6 +272,19 @@ struct SettingsView: View {
             })
         }
         .tabItem { Label("AI", systemImage: "brain") }
+    }
+
+    private var autoNotesSettings: some View {
+        List {
+            Section(header: Text("Intelligent Notes"), footer: Text("When enabled, the browser learns from your notes and browsing patterns to suggest and auto-generate new notes.")) {
+                Toggle("Auto Notes (AI Generated)", isOn: $autoNotesEnabled)
+            }
+
+            Section(header: Text("Privacy Utilities"), footer: Text("When enabled, the browser will automatically strip known tracking parameters (UTM, fbclid, etc.) from URLs.")) {
+                Toggle("Remove Tracking Parameters", isOn: $removeTrackingParameters)
+            }
+        }
+        .tabItem { Label("Utilities", systemImage: "sparkle.magnifyingglass") }
     }
 
     private var permissionsSettings: some View {

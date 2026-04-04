@@ -36,6 +36,9 @@ struct NoteAddView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         notesManager.addNote(title: title, content: content, sourceURL: sourceURL)
+                        if UserDefaults.standard.bool(forKey: "autoNotesEnabled"), let host = URL(string: sourceURL)?.host {
+                            AutoNotesLearning.shared.learnFromNote(content: content, domain: host)
+                        }
                         dismiss()
                     }
                     .disabled(content.isEmpty)

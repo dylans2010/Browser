@@ -137,8 +137,14 @@ class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
     }
 
     func loadURLString() {
-        guard let activeTab = activeTab, let url = URL(string: urlString) else { return }
+        guard let activeTab = activeTab, var url = URL(string: urlString) else { return }
         loadError = nil
+
+        if UserDefaults.standard.bool(forKey: "removeTrackingParameters") {
+            url = NoTrackingParameters.clean(url)
+            urlString = url.absoluteString
+        }
+
         activeTab.webView.load(URLRequest(url: url))
     }
 
@@ -319,6 +325,9 @@ class BrowserViewModel: NSObject, ObservableObject, @unchecked Sendable {
 extension BrowserViewModel: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         if activeTab?.webView == webView {
+            if UserDefaults.standard.bool(forKey: "autoNotesEnabled") {
+                AutoNotesLearning.shared.trackTimeSpent(url: webView.url)
+            }
             isLoading = true
             loadError = nil
             canGoBack = webView.canGoBack
@@ -345,6 +354,10 @@ extension BrowserViewModel: WKNavigationDelegate {
 
             if let url = webView.url?.absoluteString {
                 historyManager?.addHistory(url: url, title: webView.title ?? "Untitled")
+            }
+
+            if UserDefaults.standard.bool(forKey: "autoNotesEnabled") {
+                AutoNotesLearning.shared.trackVisit(url: webView.url)
             }
 
             saveTabs()
