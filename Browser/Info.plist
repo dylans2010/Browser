@@ -9,5 +9,13 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>This browser needs camera access for video calls and QR code scanning on websites.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This browser needs microphone access for voice search and video calls on websites.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This browser needs photo library access to save images from the web.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This browser needs your location to provide local weather and maps on websites.</string>
 </dict>
 </plist>

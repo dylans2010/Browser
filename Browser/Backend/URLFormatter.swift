@@ -11,6 +11,10 @@ struct URLFormatter {
 
         var result = urlString
 
+        if UserDefaults.standard.bool(forKey: "removeTrackingParameters") {
+            result = NoTrackingParameters.clean(result)
+        }
+
         // Strip common scheme+www prefixes
         for prefix in ["https://www.", "http://www.", "https://", "http://"] {
             if result.hasPrefix(prefix) {

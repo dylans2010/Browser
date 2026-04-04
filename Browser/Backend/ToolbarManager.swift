@@ -64,7 +64,8 @@ class ToolbarManager: ObservableObject {
         ToolItem(title: "Add Note", icon: "note.text.badge.plus", actionType: .addNote, category: .page, requiresWebView: true),
         ToolItem(title: "Hide Elements", icon: "eye.slash", actionType: .hideElements, category: .advanced, requiresWebView: true),
         ToolItem(title: "Revert To Original", icon: "arrow.counterclockwise.circle", actionType: .revertToOriginal, category: .advanced, requiresWebView: true),
-        ToolItem(title: "Website Styling", icon: "paintpalette", actionType: .websiteStyling, category: .advanced, requiresWebView: true)
+        ToolItem(title: "Website Styling", icon: "paintpalette", actionType: .websiteStyling, category: .advanced, requiresWebView: true),
+        ToolItem(title: "Browser Assistant", icon: "sparkles", actionType: .browserAssistant, category: .ai, requiresWebView: true)
     ]
 
     @Published var visibleToolIDs: [UUID] = []

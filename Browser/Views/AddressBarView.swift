@@ -8,6 +8,7 @@ struct AddressBarView: View {
     @FocusState.Binding var isFocused: Bool
 
     var onCommit: () -> Void
+    var onBrowserAssistantTap: () -> Void = {}
     var menuItems: AnyView? = nil
 
     @AppStorage("addressBarAlignment") var alignment: String = "Center"
@@ -15,6 +16,7 @@ struct AddressBarView: View {
     @AppStorage("showSiteIcon") var showSiteIcon: Bool = true
     @AppStorage("showReadTime") var showReadTime: Bool = true
     @AppStorage("addressBarGestures") var enableGestures: Bool = true
+    @AppStorage("showBrowserAssistant") var showBrowserAssistant: Bool = true
 
     // Fine tuning
     @AppStorage("addressBarCornerRadius") var barCornerRadius: Double = 25.0
@@ -88,6 +90,17 @@ struct AddressBarView: View {
                 .onTapGesture {
                     isFocused = true
                     selectAllAddressText()
+                }
+
+                // Trailing: Browser Assistant (Sparkles)
+                if showBrowserAssistant {
+                    Button(action: {
+                        onBrowserAssistantTap()
+                    }) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14 * barSize, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
                 }
 
                 // Trailing: Reload / Stop button

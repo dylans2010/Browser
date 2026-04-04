@@ -78,6 +78,7 @@ enum ToolActionType: String, Codable, CaseIterable {
     case hideElements
     case revertToOriginal
     case websiteStyling
+    case browserAssistant
     // UI
     case divider
 }
