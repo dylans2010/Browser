@@ -44,6 +44,9 @@ struct BrowserView: View {
     @State private var showLanguageSelection = false
     @State private var showBrowserAssistant = false
     @State private var showAutoNotes = false
+    @State private var showPageInfo = false
+    @State private var showQRCode = false
+    @State private var showPrivacyReport = false
 
     // Data for sheets
     @State private var aiResultTitle = ""
@@ -51,6 +54,8 @@ struct BrowserView: View {
     @State private var aiResultLoading = false
     @State private var pageSourceContent = ""
     @State private var pdfURL: URL? = nil
+    @State private var currentPageInfo: PageInfo? = nil
+    @State private var currentPrivacyReport: PrivacyReport? = nil
 
     var body: some View {
         ZStack {
@@ -74,13 +79,22 @@ struct BrowserView: View {
             }
 
             // Suggestions overlay
-            if isAddressBarFocused && !suggestionManager.suggestions.isEmpty {
-                SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
-                    browserViewModel.urlString = selected
-                    loadURL()
-                    isAddressBarFocused = false
+            if isAddressBarFocused {
+                VStack(spacing: 0) {
+                    SearchSuggestionsView(suggestionManager: suggestionManager, query: browserViewModel.urlString) { selected in
+                        browserViewModel.urlString = selected
+                        loadURL()
+                        isAddressBarFocused = false
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    // Empty space for the address bar to stay on top of the keyboard
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 80)
                 }
                 .zIndex(10)
+                .transition(.opacity)
             }
 
             // Address bar overlay (Safari-like)
@@ -93,9 +107,10 @@ struct BrowserView: View {
                     onBrowserAssistantTap: { showBrowserAssistant = true },
                     menuItems: AnyView(toolbarMenuItems)
                 )
-                .padding(.bottom, isAddressBarFocused ? 20 : 40)
+                .padding(.bottom, isAddressBarFocused ? 0 : 40)
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isAddressBarFocused)
+            .zIndex(20) // Ensure it's above the suggestions
 
             // Browser Assistant Overlay
             if showBrowserAssistant {
@@ -211,6 +226,19 @@ struct BrowserView: View {
                 .injectEnvironment(viewModel: browserViewModel, hider: elementHiderManager, style: websiteStyleManager, ai: aiConfig, notes: notesManager, tts: ttsManager, history: historyManager, downloads: downloadManager, toolbar: toolbarManager, favorites: favoritesManager, collections: collectionsManager, saveLater: saveForLaterManager)
                 .presentationDetents([.fraction(0.3), .medium, .large])
         }
+        .sheet(isPresented: $showPageInfo) {
+            if let info = currentPageInfo {
+                PageInfoView(info: info)
+            }
+        }
+        .sheet(isPresented: $showQRCode) {
+            QRCodeView(urlString: browserViewModel.urlString)
+        }
+        .sheet(isPresented: $showPrivacyReport) {
+            if let report = currentPrivacyReport {
+                PrivacyReportView(report: report)
+            }
+        }
         .onAppear {
             browserViewModel.historyManager = historyManager
             browserViewModel.downloadManager = downloadManager
@@ -301,114 +329,203 @@ struct BrowserView: View {
 
     private var toolbarMenuItems: some View {
         Group {
-            // New Tools
-            Group {
-                Button(action: { showBrowserAssistant = true }) {
-                    Label("Browser Assistant", systemImage: "sparkles")
-                }
-                Button(action: { showAutoNotes = true }) {
-                    Label("Auto Notes", systemImage: "note.text.badge.plus")
-                }
-                Button(action: { showAddNote = true }) {
-                    Label("Add Note", systemImage: "note.text.badge.plus")
-                }
+            // All enabled tools from ToolbarManager
+            ForEach(toolbarManager.availableTools.filter { $0.isEnabled && $0.actionType != .divider }) { tool in
                 Button(action: {
-                    browserViewModel.enableHideElementsMode(using: elementHiderManager)
+                    executeTool(tool)
                 }) {
-                    Label("Hide Elements", systemImage: "eye.slash")
+                    Label(tool.title, systemImage: tool.icon)
                 }
-                Button(action: {
-                    browserViewModel.disableHideElementsMode()
-                }) {
-                    Label("Stop Hiding Elements", systemImage: "escape")
-                }
-                .disabled(!browserViewModel.isHideElementsModeEnabled)
-                Button(action: {
-                    if let webView = browserViewModel.activeTab?.webView {
-                        RevertToOriginalTool.execute(url: browserViewModel.activeTab?.url, elementHiderManager: elementHiderManager, webView: webView)
-                    }
-                }) {
-                    Label("Revert To Original", systemImage: "arrow.counterclockwise.circle")
-                }
-                Button(action: { showWebsiteStyle = true }) {
-                    Label("Website Styling", systemImage: "paintpalette")
-                }
-                Button(action: {
-                    showLanguageSelection = true
-                }) {
-                    Label("Translate Site", systemImage: "translate")
-                }
-            }
-
-            Divider()
-
-            // Standard Navigation
-            Group {
-                Button(action: { browserViewModel.goBack() }) {
-                    Label("Back", systemImage: "chevron.left")
-                }.disabled(!browserViewModel.canGoBack)
-                Button(action: { browserViewModel.goForward() }) {
-                    Label("Forward", systemImage: "chevron.right")
-                }.disabled(!browserViewModel.canGoForward)
-                Button(action: { browserViewModel.reload() }) {
-                    Label("Reload", systemImage: "arrow.clockwise")
-                }
-            }
-
-            Divider()
-
-            // AI Features
-            Group {
-                Button(action: { showSummary = true }) { Label("Summarize Page", systemImage: "text.magnifyingglass") }
-                Button(action: { showAIChat = true }) { Label("Ask the Page", systemImage: "bubble.left.and.bubble.right") }
-            }
-
-            Divider()
-
-            // Advanced / Tools
-            Group {
-                Button(action: { showFindOnPage = true }) { Label("Find On Page", systemImage: "doc.text.magnifyingglass") }
-                Button(action: { showReaderMode = true }) { Label("Reader Mode", systemImage: "text.justify.left") }
-                Button(action: {
-                    showDeveloperTools = true
-                }) { Label("Developer Tools", systemImage: "hammer") }
-                Button(action: { showNetworkLogs = true }) { Label("Network Logs", systemImage: "network") }
-            }
-
-            Divider()
-
-            // General
-            Group {
-                Button(action: { showAllTabs = true }) { Label("All Tabs", systemImage: "square.on.square") }
-                Button(action: {
-                    let urlToCopy = NoTrackingParameters.clean(browserViewModel.urlString)
-                    UIPasteboard.general.string = urlToCopy
-                }) { Label("Copy URL", systemImage: "doc.on.doc") }
-                Button(action: {
-                    let urlToShare = NoTrackingParameters.clean(browserViewModel.urlString)
-                    if let url = URL(string: urlToShare) {
-                        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let rootVC = windowScene.windows.first?.rootViewController {
-                            rootVC.present(av, animated: true, completion: nil)
-                        }
-                    }
-                }) { Label("Share URL", systemImage: "square.and.arrow.up") }
-                Button(action: {
-                    favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
-                }) { Label("Bookmark This Page", systemImage: "bookmark") }
-                Button(action: { showBookmarks = true }) { Label("Bookmarks", systemImage: "book") }
-                Button(action: {
-                    saveForLaterManager.add(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
-                }) { Label("Save For Later", systemImage: "bookmark.circle") }
-                Button(action: { showSaveForLater = true }) { Label("Saved For Later", systemImage: "clock.arrow.circlepath") }
-                Button(action: { showDownloads = true }) { Label("Downloads", systemImage: "arrow.down.circle") }
-                Button(action: { showHistory = true }) { Label("History", systemImage: "clock") }
-                Button(action: { showSettings = true }) { Label("Settings", systemImage: "gear") }
             }
         }
     }
 
+    private func executeTool(_ tool: ToolItem) {
+        switch tool.actionType {
+        case .back: browserViewModel.goBack()
+        case .forward: browserViewModel.goForward()
+        case .reload: browserViewModel.reload()
+        case .hardRefresh:
+            if let webView = browserViewModel.activeTab?.webView {
+                HardRefreshTool.execute(webView: webView)
+            }
+        case .stopLoading: browserViewModel.stopLoading()
+        case .findOnPage: showFindOnPage = true
+        case .scrollToTop:
+            if let webView = browserViewModel.activeTab?.webView {
+                ScrollToTopTool.execute(webView: webView)
+            }
+        case .scrollToBottom:
+            if let webView = browserViewModel.activeTab?.webView {
+                ScrollToBottomTool.execute(webView: webView)
+            }
+        case .readerMode: showReaderMode = true
+        case .toggleDarkMode:
+            if let webView = browserViewModel.activeTab?.webView {
+                DarkModeTool.execute(webView: webView)
+            }
+        case .newTab: browserViewModel.addTab(url: URL(string: "https://www.google.com")!)
+        case .newPrivateTab: showPrivateTabs = true
+        case .duplicateTab:
+             if let activeTab = browserViewModel.activeTab {
+                 DuplicateTabTool.execute(viewModel: browserViewModel, tab: activeTab)
+             }
+        case .closeThisTab:
+            if let activeTab = browserViewModel.activeTab {
+                browserViewModel.removeTab(id: activeTab.id)
+            }
+        case .closeAllTabs:
+            CloseAllTabsTool.execute(viewModel: browserViewModel)
+        case .closeOtherTabs:
+            if let activeTab = browserViewModel.activeTab {
+                CloseOtherTabsTool.execute(viewModel: browserViewModel, currentTabId: activeTab.id)
+            }
+        case .viewAllTabs: showAllTabs = true
+        case .viewPrivateTabs: showPrivateTabs = true
+        case .viewPageSource:
+            if let webView = browserViewModel.activeTab?.webView {
+                ViewPageSourceTool.execute(webView: webView) { source in
+                    pageSourceContent = source
+                    showPageSource = true
+                }
+            }
+        case .copyURL:
+            let urlToCopy = NoTrackingParameters.clean(browserViewModel.urlString)
+            UIPasteboard.general.string = urlToCopy
+        case .copyPageTitle:
+            if let title = browserViewModel.activeTab?.title {
+                UIPasteboard.general.string = title
+            }
+        case .saveAsPDF:
+            if let webView = browserViewModel.activeTab?.webView {
+                SaveAsPDFTool.execute(webView: webView) { url in
+                    pdfURL = url
+                    showPDFShare = true
+                }
+            }
+        case .savePageOffline:
+            if let webView = browserViewModel.activeTab?.webView {
+                SavePageOfflineTool.execute(webView: webView)
+            }
+        case .share:
+            let urlToShare = NoTrackingParameters.clean(browserViewModel.urlString)
+            if let url = URL(string: urlToShare) {
+                let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootVC = windowScene.windows.first?.rootViewController {
+                    rootVC.present(av, animated: true, completion: nil)
+                }
+            }
+        case .pictureInPicture:
+            if let webView = browserViewModel.activeTab?.webView {
+                PictureInPictureTool.execute(webView: webView)
+            }
+        case .muteTab:
+            if let webView = browserViewModel.activeTab?.webView {
+                MuteTabTool.execute(webView: webView, mute: true)
+            }
+        case .unmuteTab:
+            if let webView = browserViewModel.activeTab?.webView {
+                MuteTabTool.execute(webView: webView, mute: false)
+            }
+        case .listenToPage:
+            if let text = browserViewModel.activeTab?.title { // Simplified for now
+                ttsManager.speak(text: text)
+            }
+        case .toggleJavaScript:
+            if let webView = browserViewModel.activeTab?.webView {
+                JavaScriptToggleTool.execute(webView: webView)
+            }
+        case .clearCookiesForSite:
+            if let url = browserViewModel.activeTab?.url {
+                ClearSiteCookiesTool.execute(url: url)
+            }
+        case .clearCacheForSite:
+            if let url = browserViewModel.activeTab?.url {
+                ClearSiteCacheTool.execute(url: url)
+            }
+        case .toggleAdBlocker:
+            ToggleAdBlockerTool.execute()
+        case .summarizePage: showSummary = true
+        case .askThePage: showAIChat = true
+        case .keyTakeaways: showSummary = true // Logic reused
+        case .toneAnalysis: showSummary = true // Logic reused
+        case .extractTasks: showSummary = true // Logic reused
+        case .inspectElement: showDeveloperTools = true
+        case .viewNetworkLogs: showNetworkLogs = true
+        case .switchUserAgent:
+            if let webView = browserViewModel.activeTab?.webView {
+                SwitchUserAgentTool.execute(webView: webView)
+            }
+        case .favoritePage:
+            favoritesManager.addFavorite(url: browserViewModel.urlString, title: browserViewModel.activeTab?.title ?? browserViewModel.urlString)
+        case .removeFromFavorites:
+            if let favorite = favoritesManager.favorites.first(where: { $0.url == browserViewModel.urlString }) {
+                favoritesManager.removeFavorite(id: favorite.id)
+            }
+        case .viewDownloads: showDownloads = true
+        case .viewHistory: showHistory = true
+        case .addToCollection: showAddToCollection = true
+        case .addNote: showAddNote = true
+        case .hideElements:
+            browserViewModel.enableHideElementsMode(using: elementHiderManager)
+        case .revertToOriginal:
+            if let webView = browserViewModel.activeTab?.webView {
+                RevertToOriginalTool.execute(url: browserViewModel.activeTab?.url, elementHiderManager: elementHiderManager, webView: webView)
+            }
+        case .websiteStyling: showWebsiteStyle = true
+        case .browserAssistant: showBrowserAssistant = true
+        case .printPage:
+            if let webView = browserViewModel.activeTab?.webView {
+                PrintPageTool.execute(webView: webView)
+            }
+        case .zoomIn:
+            if let webView = browserViewModel.activeTab?.webView {
+                ZoomInTool.execute(webView: webView)
+            }
+        case .zoomOut:
+            if let webView = browserViewModel.activeTab?.webView {
+                ZoomOutTool.execute(webView: webView)
+            }
+        case .resetZoom:
+            if let webView = browserViewModel.activeTab?.webView {
+                ResetZoomTool.execute(webView: webView)
+            }
+        case .requestDesktopSite:
+            if let webView = browserViewModel.activeTab?.webView {
+                RequestDesktopSiteTool.execute(webView: webView)
+            }
+        case .pageInfo:
+            if let webView = browserViewModel.activeTab?.webView {
+                PageInfoTool.execute(webView: webView) { info in
+                    currentPageInfo = info
+                    showPageInfo = true
+                }
+            }
+        case .generateQRCode:
+            showQRCode = true
+        case .takeScreenshot:
+            if let webView = browserViewModel.activeTab?.webView {
+                TakeScreenshotTool.execute(webView: webView) { _ in }
+            }
+        case .increaseTextSize:
+            if let webView = browserViewModel.activeTab?.webView {
+                IncreaseTextSizeTool.execute(webView: webView)
+            }
+        case .decreaseTextSize:
+            if let webView = browserViewModel.activeTab?.webView {
+                DecreaseTextSizeTool.execute(webView: webView)
+            }
+        case .resetTextSize:
+            if let webView = browserViewModel.activeTab?.webView {
+                ResetTextSizeTool.execute(webView: webView)
+            }
+        case .privacyReport:
+            currentPrivacyReport = PrivacyReportTool.execute()
+            showPrivacyReport = true
+        default: break
+        }
+    }
 }
 
 @available(iOS 16.0, *)

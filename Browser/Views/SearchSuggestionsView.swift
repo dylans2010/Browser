@@ -48,10 +48,11 @@ struct SearchSuggestionsView: View {
                         .fill(Color(UIColor.secondarySystemBackground).opacity(0.6))
                         .padding(.horizontal)
                 )
-                .padding(.top, 140) // Below the address bar area
-                .padding(.bottom, 300) // Padding for keyboard area
+                .padding(.top, 20) // Reduced top padding, since we will control it in BrowserView
+                .padding(.bottom, 400) // Padding for keyboard area
             }
         }
+        .ignoresSafeArea(.keyboard)
     }
 
     private func highlightedText(_ text: String, query: String) -> some View {

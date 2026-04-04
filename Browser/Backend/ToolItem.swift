@@ -79,6 +79,19 @@ enum ToolActionType: String, Codable, CaseIterable {
     case revertToOriginal
     case websiteStyling
     case browserAssistant
+    // Batch 1 & 2 Tools
+    case printPage
+    case zoomIn
+    case zoomOut
+    case resetZoom
+    case requestDesktopSite
+    case pageInfo
+    case generateQRCode
+    case takeScreenshot
+    case increaseTextSize
+    case decreaseTextSize
+    case resetTextSize
+    case privacyReport
     // UI
     case divider
 }

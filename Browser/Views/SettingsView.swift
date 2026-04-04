@@ -36,6 +36,9 @@ struct SettingsView: View {
     @AppStorage("addressBarOpacity") var addressBarOpacity: Double = 1.0
     @AppStorage("addressBarBlur") var addressBarBlur: Double = 1.0 // 0 to 1
 
+    // Address Bar Buttons
+    @AppStorage("addressBarButtons") var selectedButtonsJSON: String = "[\"back\", \"forward\", \"reload\", \"browserAssistant\", \"ellipsis\"]"
+
     // Startup
     @AppStorage("startupPage") var startupPage: String = "New Tab"
 
@@ -174,6 +177,26 @@ struct SettingsView: View {
                 }
             })
 
+            Section("Address Bar Controls", content: {
+                Text("Select and reorder buttons in the address bar")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                let availableButtons = [
+                    ("Back", "back", "chevron.left"),
+                    ("Forward", "forward", "chevron.right"),
+                    ("Reload/Stop", "reload", "arrow.clockwise"),
+                    ("Browser Assistant", "browserAssistant", "sparkles"),
+                    ("Main Menu", "ellipsis", "ellipsis")
+                ]
+
+                ForEach(availableButtons, id: \.1) { name, id, icon in
+                    Toggle(isOn: buttonBinding(for: id)) {
+                        Label(name, systemImage: icon)
+                    }
+                }
+            })
+
             Section("Search Engine") {
                 Picker("Search Engine", selection: $searchEngine) {
                     Text("Google").tag("Google")
@@ -185,6 +208,40 @@ struct SettingsView: View {
             }
         }
         .tabItem { Label("Appearance", systemImage: "paintbrush") }
+    }
+
+    private func buttonBinding(for id: String) -> Binding<Bool> {
+        Binding(
+            get: {
+                if let data = selectedButtonsJSON.data(using: .utf8),
+                   let buttons = try? JSONDecoder().decode([String].self, from: data) {
+                    return buttons.contains(id)
+                }
+                return ["back", "forward", "reload", "browserAssistant", "ellipsis"].contains(id)
+            },
+            set: { newValue in
+                var buttons: [String] = []
+                if let data = selectedButtonsJSON.data(using: .utf8),
+                   let decoded = try? JSONDecoder().decode([String].self, from: data) {
+                    buttons = decoded
+                } else {
+                    buttons = ["back", "forward", "reload", "browserAssistant", "ellipsis"]
+                }
+
+                if newValue {
+                    if !buttons.contains(id) {
+                        buttons.append(id)
+                    }
+                } else {
+                    buttons.removeAll { $0 == id }
+                }
+
+                if let encoded = try? JSONEncoder().encode(buttons),
+                   let json = String(data: encoded, encoding: .utf8) {
+                    selectedButtonsJSON = json
+                }
+            }
+        )
     }
 
     private var toolbarSettings: some View {

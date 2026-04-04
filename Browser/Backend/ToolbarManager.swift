@@ -65,7 +65,20 @@ class ToolbarManager: ObservableObject {
         ToolItem(title: "Hide Elements", icon: "eye.slash", actionType: .hideElements, category: .advanced, requiresWebView: true),
         ToolItem(title: "Revert To Original", icon: "arrow.counterclockwise.circle", actionType: .revertToOriginal, category: .advanced, requiresWebView: true),
         ToolItem(title: "Website Styling", icon: "paintpalette", actionType: .websiteStyling, category: .advanced, requiresWebView: true),
-        ToolItem(title: "Browser Assistant", icon: "sparkles", actionType: .browserAssistant, category: .ai, requiresWebView: true)
+        ToolItem(title: "Browser Assistant", icon: "sparkles", actionType: .browserAssistant, category: .ai, requiresWebView: true),
+        // 10+ New Tools Registration
+        ToolItem(title: "Print Page", icon: "printer", actionType: .printPage, category: .page, requiresWebView: true),
+        ToolItem(title: "Zoom In", icon: "plus.magnifyingglass", actionType: .zoomIn, category: .page, requiresWebView: true),
+        ToolItem(title: "Zoom Out", icon: "minus.magnifyingglass", actionType: .zoomOut, category: .page, requiresWebView: true),
+        ToolItem(title: "Reset Zoom", icon: "magnifyingglass", actionType: .resetZoom, category: .page, requiresWebView: true),
+        ToolItem(title: "Request Desktop Site", icon: "desktopcomputer", actionType: .requestDesktopSite, category: .page, requiresWebView: true),
+        ToolItem(title: "Page Info", icon: "info.circle", actionType: .pageInfo, category: .page, requiresWebView: true),
+        ToolItem(title: "Generate QR Code", icon: "qrcode", actionType: .generateQRCode, category: .data, requiresWebView: true),
+        ToolItem(title: "Take Screenshot", icon: "camera", actionType: .takeScreenshot, category: .data, requiresWebView: true),
+        ToolItem(title: "Increase Text Size", icon: "textformat.size.larger", actionType: .increaseTextSize, category: .page, requiresWebView: true),
+        ToolItem(title: "Decrease Text Size", icon: "textformat.size.smaller", actionType: .decreaseTextSize, category: .page, requiresWebView: true),
+        ToolItem(title: "Reset Text Size", icon: "textformat.size", actionType: .resetTextSize, category: .page, requiresWebView: true),
+        ToolItem(title: "Privacy Report", icon: "hand.raised.shield", actionType: .privacyReport, category: .privacy)
     ]
 
     @Published var visibleToolIDs: [UUID] = []
