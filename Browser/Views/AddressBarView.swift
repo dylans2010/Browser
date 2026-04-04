@@ -19,6 +19,9 @@ struct AddressBarView: View {
     @AppStorage("showBrowserAssistant") var showBrowserAssistant: Bool = true
     @AppStorage("alwaysShowAddressBar") var alwaysShowAddressBar: Bool = true
 
+    // Customization
+    @AppStorage("addressBarButtons") var selectedButtonsJSON: String = "[\"back\", \"forward\", \"reload\", \"browserAssistant\", \"ellipsis\"]"
+
     // Fine tuning
     @AppStorage("addressBarCornerRadius") var barCornerRadius: Double = 25.0
     @AppStorage("addressBarShadowRadius") var barShadowRadius: Double = 10.0
@@ -29,15 +32,42 @@ struct AddressBarView: View {
 
     @State private var isReloadAnimating = false
 
+    private var selectedButtons: [String] {
+        if let data = selectedButtonsJSON.data(using: .utf8),
+           let buttons = try? JSONDecoder().decode([String].self, from: data) {
+            return buttons
+        }
+        return ["back", "forward", "reload", "browserAssistant", "ellipsis"]
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            // Embedded tools (Leading)
-            if alignment == "Right" {
-                embeddedTools
-            }
-
             HStack(spacing: 10) {
-                // Leading: Site Icon / Lock
+                // Leading Buttons (back, forward)
+                if !isFocused {
+                    HStack(spacing: 12) {
+                        if selectedButtons.contains("back") {
+                            Button(action: { viewModel.goBack() }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 14 * barSize, weight: .bold))
+                                    .foregroundColor(viewModel.canGoBack ? .primary : .secondary.opacity(0.3))
+                            }
+                            .disabled(!viewModel.canGoBack)
+                        }
+
+                        if selectedButtons.contains("forward") {
+                            Button(action: { viewModel.goForward() }) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14 * barSize, weight: .bold))
+                                    .foregroundColor(viewModel.canGoForward ? .primary : .secondary.opacity(0.3))
+                            }
+                            .disabled(!viewModel.canGoForward)
+                        }
+                    }
+                    .padding(.leading, 8)
+                }
+
+                // Site Icon / Lock
                 if showSiteIcon {
                     if let host = viewModel.activeTab?.url?.host {
                         AsyncImage(url: URL(string: "https://www.google.com/s2/favicons?sz=64&domain=\(host)")) { image in
@@ -93,37 +123,49 @@ struct AddressBarView: View {
                     selectAllAddressText()
                 }
 
-                // Trailing: Browser Assistant (Sparkles)
-                if showBrowserAssistant {
-                    Button(action: {
-                        onBrowserAssistantTap()
-                    }) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14 * barSize, weight: .semibold))
-                            .foregroundColor(.blue)
-                    }
-                }
-
-                // Trailing: Reload / Stop button
-                if !viewModel.urlString.isEmpty {
-                    Button(action: {
-                        if viewModel.isLoading {
-                            viewModel.stopLoading()
-                        } else {
-                            viewModel.reload()
+                // Trailing Buttons
+                if !isFocused {
+                    HStack(spacing: 12) {
+                        if selectedButtons.contains("browserAssistant") {
+                            Button(action: { onBrowserAssistantTap() }) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 14 * barSize, weight: .semibold))
+                                    .foregroundColor(.blue)
+                            }
                         }
-                    }) {
-                        Image(systemName: viewModel.isLoading ? "xmark" : "arrow.clockwise")
-                            .font(.system(size: 14 * barSize))
-                            .foregroundColor(.secondary)
-                            .rotationEffect(.degrees(isReloadAnimating ? 360 : 0))
-                            .animation(
-                                viewModel.isLoading
-                                ? .linear(duration: 0.8).repeatForever(autoreverses: false)
-                                : .default,
-                                value: isReloadAnimating
-                            )
+
+                        if selectedButtons.contains("reload") {
+                            Button(action: {
+                                if viewModel.isLoading {
+                                    viewModel.stopLoading()
+                                } else {
+                                    viewModel.reload()
+                                }
+                            }) {
+                                Image(systemName: viewModel.isLoading ? "xmark" : "arrow.clockwise")
+                                    .font(.system(size: 14 * barSize, weight: .bold))
+                                    .foregroundColor(.primary)
+                                    .rotationEffect(.degrees(isReloadAnimating ? 360 : 0))
+                                    .animation(
+                                        viewModel.isLoading
+                                        ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                                        : .default,
+                                        value: isReloadAnimating
+                                    )
+                            }
+                        }
+
+                        if selectedButtons.contains("ellipsis"), let menu = menuItems {
+                            Menu {
+                                menu
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 14 * barSize, weight: .bold))
+                                    .foregroundColor(.primary)
+                            }
+                        }
                     }
+                    .padding(.trailing, 8)
                 }
             }
             .padding(.horizontal, 12)
@@ -135,24 +177,6 @@ struct AddressBarView: View {
                     .shadow(color: Color.black.opacity(0.1), radius: barShadowRadius, x: 0, y: 5)
             )
             .scaleEffect(barSize)
-
-            // Embedded tools (Trailing)
-            if alignment != "Right" {
-                embeddedTools
-            }
-
-            // 3-dot menu button
-            if let menu = menuItems {
-                Menu {
-                    menu
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16 * barSize, weight: .semibold))
-                        .padding(10)
-                        .background(Circle().fill(.ultraThinMaterial))
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                }
-            }
         }
         .padding(.horizontal)
         .gesture(
@@ -166,25 +190,6 @@ struct AddressBarView: View {
         )
         .onChange(of: viewModel.isLoading) { isLoading in
             isReloadAnimating = isLoading
-        }
-    }
-
-    private var embeddedTools: some View {
-        HStack(spacing: 8) {
-            ForEach(toolbarManager.availableTools.filter { $0.isEnabled && $0.category == .navigation }.prefix(2)) { tool in
-                Button(action: {
-                    // Logic to execute tool action would normally go here
-                    // For now, we use existing viewModel methods for navigation
-                    if tool.actionType == .back { viewModel.goBack() }
-                    if tool.actionType == .forward { viewModel.goForward() }
-                }) {
-                    Image(systemName: tool.icon)
-                        .font(.system(size: 14 * barSize, weight: .medium))
-                        .padding(8)
-                        .background(Circle().fill(.ultraThinMaterial))
-                }
-                .disabled(tool.actionType == .back ? !viewModel.canGoBack : (tool.actionType == .forward ? !viewModel.canGoForward : false))
-            }
         }
     }
 
