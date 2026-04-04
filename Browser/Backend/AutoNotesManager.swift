@@ -2,6 +2,7 @@ import Foundation
 import Combine
 
 @available(iOS 16.0, *)
+@MainActor
 class AutoNotesManager: ObservableObject {
     static let shared = AutoNotesManager()
 
@@ -14,10 +15,8 @@ class AutoNotesManager: ObservableObject {
     func generateNote(for url: URL?, content: String) async {
         guard let host = url?.host else { return }
 
-        DispatchQueue.main.async {
-            self.isGenerating = true
-            self.lastGeneratedNote = nil
-        }
+        self.isGenerating = true
+        self.lastGeneratedNote = nil
 
         let learnedContext = learning.getLearnedContext(for: host)
         let prompt = """
@@ -38,15 +37,11 @@ class AutoNotesManager: ObservableObject {
                 context: "Auto-generating a note based on page content and learned patterns."
             )
 
-            DispatchQueue.main.async {
-                self.lastGeneratedNote = result
-                self.isGenerating = false
-            }
+            self.lastGeneratedNote = result
+            self.isGenerating = false
         } catch {
             print("AutoNotesManager: Error generating note: \(error)")
-            DispatchQueue.main.async {
-                self.isGenerating = false
-            }
+            self.isGenerating = false
         }
     }
 }

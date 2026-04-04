@@ -367,9 +367,7 @@ struct BrowserView: View {
         case .newTab: browserViewModel.addTab(url: URL(string: "https://www.google.com")!)
         case .newPrivateTab: showPrivateTabs = true
         case .duplicateTab:
-             if let activeTab = browserViewModel.activeTab {
-                 DuplicateTabTool.execute(viewModel: browserViewModel, tab: activeTab)
-             }
+             DuplicateTabTool.execute(viewModel: browserViewModel)
         case .closeThisTab:
             if let activeTab = browserViewModel.activeTab {
                 browserViewModel.removeTab(id: activeTab.id)
@@ -377,9 +375,7 @@ struct BrowserView: View {
         case .closeAllTabs:
             CloseAllTabsTool.execute(viewModel: browserViewModel)
         case .closeOtherTabs:
-            if let activeTab = browserViewModel.activeTab {
-                CloseOtherTabsTool.execute(viewModel: browserViewModel, currentTabId: activeTab.id)
-            }
+            CloseOtherTabsTool.execute(viewModel: browserViewModel)
         case .viewAllTabs: showAllTabs = true
         case .viewPrivateTabs: showPrivateTabs = true
         case .viewPageSource:
@@ -430,7 +426,7 @@ struct BrowserView: View {
             }
         case .listenToPage:
             if let text = browserViewModel.activeTab?.title { // Simplified for now
-                ttsManager.speak(text: text)
+                ttsManager.speak(text)
             }
         case .toggleJavaScript:
             if let webView = browserViewModel.activeTab?.webView {
