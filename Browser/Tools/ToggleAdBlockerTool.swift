@@ -1,6 +1,10 @@
 import Foundation
 
 struct ToggleAdBlockerTool {
+    static func execute(for host: String) {
+        _ = toggle(for: host)
+    }
+
     private static let key = "adBlockerDisabledSites"
 
     static func isDisabled(for host: String) -> Bool {
